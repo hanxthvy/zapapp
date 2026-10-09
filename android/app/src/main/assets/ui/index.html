@@ -1,0 +1,295 @@
+<!-- [xihanzu-NR] -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#111b21">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="ZapApp Lightweight Mobile SPA">
+  <title>ZapApp</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/chat.css">
+  <link rel="stylesheet" href="css/auth.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-top">
+        <h1 class="brand-title">ZapApp</h1>
+        <div class="header-actions">
+          <button class="icon-btn" aria-label="Camera">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+          </button>
+          <button class="icon-btn" aria-label="Search" id="header-search-btn">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </button>
+          <button class="icon-btn" aria-label="More options">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <circle cx="12" cy="5" r="2"></circle>
+              <circle cx="12" cy="12" r="2"></circle>
+              <circle cx="12" cy="19" r="2"></circle>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="tabs-nav" role="tablist">
+        <button class="tab-btn active" role="tab" data-tab="chats" aria-selected="true">
+          Chats
+          <span class="tab-badge">3</span>
+        </button>
+        <button class="tab-btn" role="tab" data-tab="status" aria-selected="false">
+          Status
+        </button>
+        <button class="tab-btn" role="tab" data-tab="calls" aria-selected="false">
+          Calls
+        </button>
+        <button class="tab-btn" role="tab" data-tab="settings" aria-selected="false">
+          Settings
+        </button>
+        <div class="tab-indicator" id="tab-indicator"></div>
+      </nav>
+    </header>
+
+    <!-- Search Bar -->
+    <div class="search-container" id="search-container">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" class="search-input" id="search-input" placeholder="Search or start new chat" autocomplete="off" autocorrect="off">
+        <button class="search-clear" id="search-clear" aria-label="Clear search">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content Panels -->
+    <main class="app-content">
+      <!-- Chats Panel -->
+      <section class="tab-panel active" id="tab-chats" role="tabpanel">
+        <div class="list-group">
+          <article class="list-item">
+            <div class="avatar">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+            </div>
+            <div class="item-content">
+              <div class="item-header">
+                <span class="item-title">Engineering Core</span>
+                <span class="item-time highlight">11:42 AM</span>
+              </div>
+              <div class="item-sub">
+                <span class="item-message">Rust client protocol compilation verified</span>
+                <span class="unread-count">2</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="list-item">
+            <div class="avatar">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+            </div>
+            <div class="item-content">
+              <div class="item-header">
+                <span class="item-title">DevOps Bot</span>
+                <span class="item-time highlight">10:15 AM</span>
+              </div>
+              <div class="item-sub">
+                <span class="item-message">Gateway container deployment healthy</span>
+                <span class="unread-count">1</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="list-item">
+            <div class="avatar">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+            </div>
+            <div class="item-content">
+              <div class="item-header">
+                <span class="item-title">Support Team</span>
+                <span class="item-time">Yesterday</span>
+              </div>
+              <div class="item-sub">
+                <span class="item-message">All test suites passed cleanly.</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="list-item">
+            <div class="avatar">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+            </div>
+            <div class="item-content">
+              <div class="item-header">
+                <span class="item-title">Platform Architecture</span>
+                <span class="item-time">Oct 8</span>
+              </div>
+              <div class="item-sub">
+                <span class="item-message">Mobile SPA shell lightweight baseline ready.</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Status Panel -->
+      <section class="tab-panel" id="tab-status" role="tabpanel">
+        <div class="list-group">
+          <div class="list-item">
+            <div class="avatar avatar-status-ring">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+            </div>
+            <div class="item-content">
+              <div class="item-header">
+                <span class="item-title">My status</span>
+              </div>
+              <div class="item-sub">
+                <span class="item-message">Tap to add status update</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section-title">Recent updates</div>
+
+          <div class="list-item">
+            <div class="avatar avatar-status-ring">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+            </div>
+            <div class="item-content">
+              <div class="item-header">
+                <span class="item-title">Alex Mercer</span>
+                <span class="item-time">45 minutes ago</span>
+              </div>
+              <div class="item-sub">
+                <span class="item-message">Deployment verified</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Calls Panel -->
+      <section class="tab-panel" id="tab-calls" role="tabpanel">
+        <div class="list-group">
+          <div class="list-item">
+            <div class="avatar">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+            </div>
+            <div class="item-content">
+              <div class="item-header">
+                <span class="item-title">Alex Mercer</span>
+                <span class="item-time">Today, 9:20 AM</span>
+              </div>
+              <div class="item-sub">
+                <span class="item-message">Incoming voice call</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings Panel -->
+      <section class="tab-panel" id="tab-settings" role="tabpanel">
+        <div class="profile-card">
+          <div class="profile-avatar">Z</div>
+          <div class="profile-details">
+            <div class="profile-name">ZapApp Admin</div>
+            <div class="profile-status">Hey there! Using ZapApp</div>
+          </div>
+        </div>
+
+        <div class="settings-section-title">Preferences</div>
+
+        <div class="settings-row" id="settings-linked-devices-btn" style="cursor: pointer;">
+          <div class="settings-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M4 6h16v10H4z" fill="none"/>
+              <path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/>
+            </svg>
+          </div>
+          <div class="item-content">
+            <div class="settings-title">Linked Devices</div>
+            <div class="settings-desc">Link companion devices via QR code or phone number</div>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>
+            </svg>
+          </div>
+          <div class="item-content">
+            <div class="settings-title">Account & Security</div>
+            <div class="settings-desc">Security notifications, two-step verification</div>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/>
+            </svg>
+          </div>
+          <div class="item-content">
+            <div class="settings-title">Chats & Storage</div>
+            <div class="settings-desc">Theme, wallpaper, chat history</div>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+            </svg>
+          </div>
+          <div class="item-content">
+            <div class="settings-title">Notifications</div>
+            <div class="settings-desc">Message, group & call tones</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Floating Action Button (FAB) -->
+    <button class="fab" id="fab-btn" aria-label="Action">
+      <svg viewBox="0 0 24 24" width="24" height="24">
+        <path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/>
+        <path fill="currentColor" d="M7 9h10v2H7zm0-3h10v2H7z"/>
+      </svg>
+    </button>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script src="js/chat.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>

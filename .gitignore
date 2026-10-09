@@ -1,0 +1,9 @@
+# [xihanzu-NR]
+target/
+android/build/
+android/.gradle/
+android/app/build/
+release.keystore
+*.idsig
+.DS_Store
+*.log

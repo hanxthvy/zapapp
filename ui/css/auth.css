@@ -1,0 +1,705 @@
+/* [xihanzu-NR] */
+/* Pairing & Authentication Screen Styles for ZapApp */
+
+.pairing-view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  z-index: 150;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(16px);
+  transition: opacity var(--transition-normal), transform var(--transition-normal);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.pairing-view.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+/* Header */
+.pairing-header {
+  height: var(--header-height);
+  padding-top: var(--safe-area-top);
+  background-color: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 8px;
+  padding-right: 16px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.pairing-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pairing-back-btn {
+  background: none;
+  border: none;
+  color: var(--icon-color);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-fast);
+}
+
+.pairing-back-btn:hover {
+  background-color: var(--bg-hover);
+}
+
+.pairing-header-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pairing-header-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: rgba(0, 168, 132, 0.15);
+  color: var(--accent);
+  padding: 3px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.3px;
+}
+
+/* Content Container */
+.pairing-content {
+  flex: 1;
+  max-width: 460px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 20px 16px 32px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Mode Switcher Tabs */
+.pairing-tabs {
+  display: flex;
+  background-color: var(--bg-surface);
+  border-radius: 20px;
+  padding: 3px;
+  margin-bottom: 24px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.pairing-tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  padding: 8px 14px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+}
+
+.pairing-tab-btn.active {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+/* Sections */
+.pairing-section {
+  width: 100%;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  animation: pairingFadeIn 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pairing-section.active {
+  display: flex;
+}
+
+@keyframes pairingFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* QR Code Display Card */
+.qr-card-wrapper {
+  position: relative;
+  width: 256px;
+  height: 256px;
+  background-color: #ffffff;
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-code-svg-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-code-svg-container svg {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+}
+
+/* QR Center Logo */
+.qr-center-logo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-center-logo svg {
+  width: 100%;
+  height: 100%;
+  color: var(--accent);
+}
+
+/* QR Expired Overlay */
+.qr-expired-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(11, 20, 26, 0.9);
+  border-radius: 16px;
+  backdrop-filter: blur(3px);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  z-index: 10;
+}
+
+.qr-expired-overlay.active {
+  display: flex;
+}
+
+.qr-expired-title {
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.qr-reload-btn {
+  background-color: var(--accent);
+  color: #111b21;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.qr-reload-btn:hover {
+  background-color: var(--accent-hover);
+}
+
+/* Auto-Refresh Timer Bar */
+.qr-timer-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  background-color: var(--bg-secondary);
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+}
+
+.qr-timer-ring {
+  width: 18px;
+  height: 18px;
+  transform: rotate(-90deg);
+}
+
+.qr-timer-ring circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.qr-timer-ring-bg {
+  stroke: var(--border-color);
+}
+
+.qr-timer-ring-progress {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.8s linear;
+}
+
+.qr-timer-text {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.qr-timer-count {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Step-by-Step Instructions */
+.pairing-steps-card {
+  width: 100%;
+  background-color: var(--bg-secondary);
+  border-radius: 14px;
+  padding: 18px 16px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.pairing-steps-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.pairing-step-item {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.pairing-step-item:last-child {
+  margin-bottom: 0;
+}
+
+.pairing-step-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: var(--bg-surface);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.pairing-step-text strong {
+  color: var(--text-primary);
+}
+
+/* Link with phone number toggle link */
+.pairing-switch-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color var(--transition-fast);
+}
+
+.pairing-switch-link:hover {
+  background-color: rgba(0, 168, 132, 0.1);
+}
+
+/* Phone Input Form */
+.phone-form-card {
+  width: 100%;
+  background-color: var(--bg-secondary);
+  border-radius: 14px;
+  padding: 20px 16px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 20px;
+}
+
+.phone-form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.phone-form-desc {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.phone-input-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.phone-country-select {
+  width: 110px;
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.9375rem;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='%238696a0' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+
+.phone-number-input {
+  flex: 1;
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.phone-number-input:focus {
+  border-color: var(--accent);
+}
+
+.phone-number-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.pairing-primary-btn {
+  width: 100%;
+  background-color: var(--accent);
+  color: #111b21;
+  border: none;
+  border-radius: 22px;
+  padding: 12px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.pairing-primary-btn:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+}
+
+.pairing-primary-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 8-Digit Pairing Code Display */
+.code-display-card {
+  width: 100%;
+  background-color: var(--bg-secondary);
+  border-radius: 14px;
+  padding: 24px 16px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.code-boxes-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 18px 0;
+  flex-wrap: wrap;
+}
+
+.code-box-group {
+  display: flex;
+  gap: 6px;
+}
+
+.code-box {
+  width: 34px;
+  height: 46px;
+  background-color: var(--bg-surface);
+  border: 1.5px solid var(--border-color);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--accent);
+  user-select: all;
+  -webkit-user-select: all;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.code-box.filled {
+  border-color: var(--accent);
+  background-color: rgba(0, 168, 132, 0.08);
+}
+
+.code-boxes-separator {
+  width: 12px;
+  height: 2px;
+  background-color: var(--text-secondary);
+  margin: 0 4px;
+}
+
+.code-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.code-copy-btn {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 18px;
+  padding: 8px 16px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.code-copy-btn:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.code-copy-btn.copied {
+  background-color: rgba(0, 168, 132, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.code-timer-text {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.code-phone-target {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.code-phone-target strong {
+  color: var(--text-primary);
+}
+
+/* State Transition Screen */
+.pairing-transition-card {
+  width: 100%;
+  background-color: var(--bg-secondary);
+  border-radius: 14px;
+  padding: 32px 20px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* Spinner */
+.transition-spinner {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.transition-spinner-circle {
+  width: 100%;
+  height: 100%;
+  border: 4px solid var(--border-color);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: pairingSpin 0.9s linear infinite;
+}
+
+@keyframes pairingSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Checkmark Animated Icon */
+.transition-check-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: rgba(0, 168, 132, 0.15);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  animation: pairingPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes pairingPop {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.transition-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.transition-desc {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin-bottom: 20px;
+  max-width: 320px;
+}
+
+/* Progress bar for Syncing */
+.sync-progress-wrapper {
+  width: 100%;
+  max-width: 300px;
+  margin-bottom: 16px;
+}
+
+.sync-progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background-color: var(--bg-surface);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.sync-progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background-color: var(--accent);
+  border-radius: 4px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sync-progress-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+/* State Steps Indicator */
+.pairing-steps-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.pairing-step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--border-color);
+  transition: all var(--transition-fast);
+}
+
+.pairing-step-dot.active {
+  background-color: var(--accent);
+  transform: scale(1.2);
+}
+
+.pairing-step-dot.done {
+  background-color: var(--accent);
+  opacity: 0.6;
+}
+
+/* Error banner */
+.pairing-error-box {
+  background-color: rgba(234, 67, 53, 0.12);
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  color: #ff8a80;
+  font-size: 0.875rem;
+  width: 100%;
+  display: none;
+  text-align: left;
+}
+
+.pairing-error-box.active {
+  display: block;
+}

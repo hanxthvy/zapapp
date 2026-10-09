@@ -1,0 +1,4 @@
+# [xihanzu-NR]
+[workspace]
+members = ["core"]
+resolver = "2"
