@@ -152,11 +152,12 @@ global.document = {
   querySelectorAll: (sel) => rootDoc.querySelectorAll(sel)
 };
 
-global.navigator = {
+const mockNavigator = {
   clipboard: {
-    writeText: async (text) => { global.navigator._copiedText = text; }
+    writeText: async (text) => { mockNavigator._copiedText = text; }
   }
 };
+Object.defineProperty(global, 'navigator', { value: mockNavigator, configurable: true, writable: true });
 
 // Mock Bridge for Android
 global.window.ZapBridge = {

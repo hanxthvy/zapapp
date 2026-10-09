@@ -1,4 +1,5 @@
 <!-- [xihanzu-NR] -->
+<!-- // [xihanzu-NR] -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -43,10 +44,10 @@
       </div>
 
       <!-- Navigation Tabs -->
+      <!-- [xihanzu-NR] // [xihanzu-NR] -->
       <nav class="tabs-nav" role="tablist">
         <button class="tab-btn active" role="tab" data-tab="chats" aria-selected="true">
           Chats
-          <span class="tab-badge">3</span>
         </button>
         <button class="tab-btn" role="tab" data-tab="status" aria-selected="false">
           Status
@@ -96,76 +97,16 @@
           <button class="auth-banner-btn" id="auth-banner-link-btn">Tautkan</button>
         </div>
 
-        <div class="list-group">
-          <article class="list-item">
-            <div class="avatar">
-              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-              </svg>
-            </div>
-            <div class="item-content">
-              <div class="item-header">
-                <span class="item-title">Engineering Core</span>
-                <span class="item-time highlight">11:42 AM</span>
-              </div>
-              <div class="item-sub">
-                <span class="item-message">Rust client protocol compilation verified</span>
-                <span class="unread-count">2</span>
-              </div>
-            </div>
-          </article>
-
-          <article class="list-item">
-            <div class="avatar">
-              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-              </svg>
-            </div>
-            <div class="item-content">
-              <div class="item-header">
-                <span class="item-title">DevOps Bot</span>
-                <span class="item-time highlight">10:15 AM</span>
-              </div>
-              <div class="item-sub">
-                <span class="item-message">Gateway container deployment healthy</span>
-                <span class="unread-count">1</span>
-              </div>
-            </div>
-          </article>
-
-          <article class="list-item">
-            <div class="avatar">
-              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-              </svg>
-            </div>
-            <div class="item-content">
-              <div class="item-header">
-                <span class="item-title">Support Team</span>
-                <span class="item-time">Yesterday</span>
-              </div>
-              <div class="item-sub">
-                <span class="item-message">All test suites passed cleanly.</span>
-              </div>
-            </div>
-          </article>
-
-          <article class="list-item">
-            <div class="avatar">
-              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-              </svg>
-            </div>
-            <div class="item-content">
-              <div class="item-header">
-                <span class="item-title">Platform Architecture</span>
-                <span class="item-time">Oct 8</span>
-              </div>
-              <div class="item-sub">
-                <span class="item-message">Mobile SPA shell lightweight baseline ready.</span>
-              </div>
-            </div>
-          </article>
+        <!-- [xihanzu-NR] // [xihanzu-NR] Dynamic chats list container -->
+        <div class="list-group" id="chats-list-group">
+          <!-- Empty State (No Mock Chats) -->
+          <div class="empty-state-card" id="empty-chats-state" style="padding: 48px 20px; text-align: center; color: #8696a0;">
+            <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 12px; color: #00a884; opacity: 0.8;">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <div style="font-size: 15px; font-weight: 600; color: #e9edef; margin-bottom: 6px;">Belum Ada Obrolan</div>
+            <div style="font-size: 13px; line-height: 1.4;">Tautkan akun WhatsApp Anda untuk menyinkronkan daftar percakapan secara otomatis.</div>
+          </div>
         </div>
       </section>
 
@@ -190,43 +131,30 @@
 
           <div class="settings-section-title">Recent updates</div>
 
-          <div class="list-item">
-            <div class="avatar avatar-status-ring">
-              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-              </svg>
-            </div>
-            <div class="item-content">
-              <div class="item-header">
-                <span class="item-title">Alex Mercer</span>
-                <span class="item-time">45 minutes ago</span>
-              </div>
-              <div class="item-sub">
-                <span class="item-message">Deployment verified</span>
-              </div>
-            </div>
+          <!-- [xihanzu-NR] // [xihanzu-NR] Empty State (No Mock Status) -->
+          <div class="empty-state-card" id="empty-status-state" style="padding: 48px 20px; text-align: center; color: #8696a0;">
+            <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 12px; color: #00a884; opacity: 0.8;">
+              <circle cx="12" cy="12" r="9" stroke-dasharray="4 2"></circle>
+              <path d="M12 8v4l2 2"></path>
+            </svg>
+            <div style="font-size: 15px; font-weight: 600; color: #e9edef; margin-bottom: 6px;">Belum Ada Pembaruan Status</div>
+            <div style="font-size: 13px; line-height: 1.4;">Pembaruan status dari kontak WhatsApp Anda akan muncul di sini secara otomatis.</div>
           </div>
         </div>
       </section>
 
       <!-- Calls Panel -->
+      <!-- [xihanzu-NR] // [xihanzu-NR] -->
       <section class="tab-panel" id="tab-calls" role="tabpanel">
-        <div class="list-group">
-          <div class="list-item">
-            <div class="avatar">
-              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-              </svg>
-            </div>
-            <div class="item-content">
-              <div class="item-header">
-                <span class="item-title">Alex Mercer</span>
-                <span class="item-time">Today, 9:20 AM</span>
-              </div>
-              <div class="item-sub">
-                <span class="item-message">Incoming voice call</span>
-              </div>
-            </div>
+        <!-- [xihanzu-NR] // [xihanzu-NR] Dynamic calls list container -->
+        <div class="list-group" id="calls-list-group">
+          <!-- Empty State (No Mock Calls) -->
+          <div class="empty-state-card" id="empty-calls-state" style="padding: 48px 20px; text-align: center; color: #8696a0;">
+            <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 12px; color: #00a884; opacity: 0.8;">
+              <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.44-5.15-3.75-6.59-6.59l1.97-1.57c.26-.26.35-.65.24-1.01A11.36 11.36 0 0 1 8.56 4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.62c0-.55-.45-1-.99-1z"/>
+            </svg>
+            <div style="font-size: 15px; font-weight: 600; color: #e9edef; margin-bottom: 6px;">Belum Ada Riwayat Panggilan</div>
+            <div style="font-size: 13px; line-height: 1.4;">Panggilan suara dan video dengan kontak WhatsApp Anda akan muncul di sini secara otomatis.</div>
           </div>
         </div>
       </section>
@@ -405,8 +333,8 @@
     </div>
   </div>
 
-  <script src="js/app.js"></script>
-  <script src="js/chat.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/chat.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

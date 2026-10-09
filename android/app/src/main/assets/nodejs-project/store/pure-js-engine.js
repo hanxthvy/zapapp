@@ -500,6 +500,8 @@ class PureJsSqliteEngine {
     if (!m) return { changes: 0 };
     const tblName = m[1].toLowerCase();
     const cols = m[2].split(',').map(s => s.trim().toLowerCase());
+    const orReplace = /^INSERT\s+OR\s+REPLACE\s+INTO/i.test(sql.trim());
+    const conflict = sql.match(/ON\s+CONFLICT\s*(?:\([^)]*\))?\s+DO\s+(NOTHING|UPDATE\s+SET\s+([\s\S]+))/i);
 
     if (!this.tables.has(tblName)) {
       this.tables.set(tblName, new Map());
@@ -512,9 +514,31 @@ class PureJsSqliteEngine {
     }
 
     const pk = this._computeRowPk(tblName, row);
-    const prevRow = tbl.get(pk) ? this._serializeRow(tbl.get(pk)) : null;
+    const existing = tbl.get(pk);
 
-    tbl.set(pk, row);
+    // Duplicate primary key: honor ON CONFLICT, else raise like real SQLite so
+    // a missing UPSERT clause in a store class surfaces instead of silently masking.
+    let nextRow = row;
+    if (existing) {
+      if (conflict && /^NOTHING/i.test(conflict[1])) {
+        this.lastChanges = 0;
+        return { changes: 0 };
+      }
+      if (conflict) {
+        // DO UPDATE SET: merge excluded.* assignments, keep unmentioned columns intact.
+        nextRow = { ...existing };
+        for (const assignment of conflict[2].split(',')) {
+          const am = assignment.match(/([a-zA-Z0-9_]+)\s*=\s*excluded\.([a-zA-Z0-9_]+)/i);
+          if (am) nextRow[am[1].toLowerCase()] = row[am[2].toLowerCase()];
+        }
+      } else if (!orReplace) {
+        throw new Error(`UNIQUE constraint failed: ${tblName}.${this._getTablePkCols(tblName).join(', ')}`);
+      }
+    }
+
+    const prevRow = existing ? this._serializeRow(existing) : null;
+
+    tbl.set(pk, nextRow);
     this.lastChanges = 1;
 
     const walEntry = {
@@ -522,7 +546,7 @@ class PureJsSqliteEngine {
       table: tblName,
       pk,
       prevRow,
-      row: this._serializeRow(row)
+      row: this._serializeRow(nextRow)
     };
 
     if (this.inTransaction) {

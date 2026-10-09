@@ -1,6 +1,13 @@
 // [xihanzu-NR]
 'use strict';
 
+// Ensure WebSocket is globally available for WaClient in Node 18
+if (!globalThis.WebSocket) {
+  try { globalThis.WebSocket = require("./node_modules/ws"); } catch (_) {
+    try { globalThis.WebSocket = require("ws"); } catch (_) {}
+  }
+}
+
 /**
  * Node.js Mobile entry point for ZapApp on Android.
  * Embeds zapo-js WhatsApp client engine with SQLite WAL persistence.
@@ -73,9 +80,11 @@ const { WaClient, createStore, proto, unwrapMessage, getContentType } = zapo;
 // -----------------------------------------------------------------------------
 
 let waClient = null;
+let lastEmittedQr = null;
 let persistenceStore = null;
 let pairingFlowHandler = null;
-let isInitializing = false;
+let qrFlowHandler = null; // [xihanzu-NR] qr-flow.js owns QR rotation/SVG; pairing-flow owns 8-digit codes
+let initPromise = null; // [xihanzu-NR] in-flight init promise; concurrent callers await it instead of seeing uninitialized waClient
 
 // -----------------------------------------------------------------------------
 // 3. Serialization Helpers
@@ -237,6 +246,31 @@ async function handleRequestPairingCode(args) {
   };
 }
 
+async function handleRequestQr() {
+  if (lastEmittedQr) {
+    emitToBridge('qr_live', lastEmittedQr);
+    emitToBridge('auth_qr', lastEmittedQr);
+    return { status: 'ok', cached: true };
+  }
+  // [xihanzu-NR] DEFECT_QR_REFRESH_WRONG_HANDLER: QR rotation is owned by qr-flow.js;
+  // pairing-flow.js handles 8-digit pairing codes and exposes no QR refresh.
+  const qrEngineFlow = qrFlowHandler && qrFlowHandler.engine && qrFlowHandler.engine.auth
+    ? qrFlowHandler.engine.auth.qrFlow
+    : null;
+  if (qrEngineFlow && typeof qrEngineFlow.refreshCurrentQr === 'function') {
+    qrEngineFlow.refreshCurrentQr();
+    return { status: 'ok', refreshed: true };
+  }
+  if (waClient) {
+    // [xihanzu-NR] WaClient exposes no hasQr(); state lives on getState().
+    const state = (typeof waClient.getState === 'function' ? waClient.getState() : null) || {};
+    if (!state.connected && !state.registered && !state.hasQr) {
+      waClient.connect().catch((e) => console.warn('[NodeRunner] connect error:', e.message));
+    }
+  }
+  return { status: 'ok' };
+}
+
 async function handleDisconnect() {
   if (waClient) {
     try {
@@ -263,6 +297,9 @@ async function dispatchCommand(command, args = {}) {
     case 'request_pairing_code':
     case 'requestpairingcode':
       return await handleRequestPairingCode(args);
+    case 'request_qr':
+    case 'requestqr':
+      return await handleRequestQr();
     case 'disconnect':
       return await handleDisconnect();
     default:
@@ -278,6 +315,7 @@ function setupIpcListeners() {
   ipcBridge.registerCommand('send_message', handleSendMessage);
   ipcBridge.registerCommand('send_button_message', handleSendButtonMessage);
   ipcBridge.registerCommand('request_pairing_code', handleRequestPairingCode);
+  ipcBridge.registerCommand('request_qr', handleRequestQr);
   ipcBridge.registerCommand('disconnect', handleDisconnect);
 
   ipcBridge.start();
@@ -287,9 +325,17 @@ function setupIpcListeners() {
 // 7. WaClient Lifecycle and Event Wiring
 // -----------------------------------------------------------------------------
 
-async function initializeClient() {
-  if (isInitializing) return waClient;
-  isInitializing = true;
+function initializeClient() {
+  if (!initPromise) {
+    initPromise = doInitializeClient().catch((err) => {
+      initPromise = null; // [xihanzu-NR] allow retry after startup failure
+      throw err;
+    });
+  }
+  return initPromise;
+}
+
+async function doInitializeClient() {
 
   const storageDir = process.env.NODEJS_STORAGE_PATH || resolveFilesDir();
   const dbPath = getSessionDbPath(storageDir);
@@ -340,19 +386,20 @@ async function initializeClient() {
   // 1. 'auth_qr': emits live official QR string from WhatsApp Web server to Android bridge
   waClient.on('auth_qr', (evt) => {
     console.log('[NodeRunner] Live official QR string received from WhatsApp Web server.');
-    emitToBridge('auth_qr', {
+    lastEmittedQr = {
       qr: evt.qr,
       payload: evt.qr,
       ttl: Math.round((evt.ttlMs || 60000) / 1000),
       ttlMs: evt.ttlMs || 60000
-    });
+    }; // [xihanzu-NR] cache live QR so request_qr fast-path can replay it
+    emitToBridge('auth_qr', lastEmittedQr);
   });
 
   // Integrate qr-flow handler for SVG generation and seamless QR rotation
   try {
     const { setupQrFlow } = require('./qr-flow');
     if (typeof setupQrFlow === 'function') {
-      setupQrFlow(waClient, {
+      qrFlowHandler = setupQrFlow(waClient, {
         bridge: {
           send: (evt, data) => emitToBridge(evt, data)
         },
@@ -436,7 +483,6 @@ async function initializeClient() {
     });
   }
 
-  isInitializing = false;
   return waClient;
 }
 
@@ -499,5 +545,6 @@ module.exports = {
   ipcBridge,
   getClient: () => waClient,
   getPersistenceStore: () => persistenceStore,
-  getPairingFlow: () => pairingFlowHandler
+  getPairingFlow: () => pairingFlowHandler,
+  getQrFlow: () => qrFlowHandler // [xihanzu-NR]
 };

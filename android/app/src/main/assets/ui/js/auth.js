@@ -8,6 +8,16 @@
   // Standalone QR Code SVG Matrix Generator (ISO/IEC 18004 Byte Mode)
   // ---------------------------------------------------------------------------
 
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   const GF_EXP = new Uint8Array(512);
   const GF_LOG = new Uint8Array(256);
   (function initGaloisField() {
@@ -763,16 +773,7 @@
   // Pairing Code Generation & Display
   // ---------------------------------------------------------------------------
 
-  const PAIRING_CHARSET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-
-  function generateSamplePairingCode() {
-    let result = '';
-    for (let i = 0; i < 8; i++) {
-      const idx = Math.floor(Math.random() * PAIRING_CHARSET.length);
-      result += PAIRING_CHARSET[idx];
-    }
-    return result;
-  }
+  // [xihanzu-NR] Live official Meta pairing code rendering only
 
   function renderPairingCode(code) {
     const clean = String(code || '--------').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
@@ -1203,13 +1204,20 @@
       startQrTimer(ttlSecs || DEFAULT_QR_TTL);
     },
 
-    // Request new QR code (bridge dispatch + fallback simulation)
+    // Request new QR code from live WhatsApp Web server via native bridge
     requestNewQr: function () {
       initDOM();
-      const mockRef = 'zap_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      const mockPayload = mockRef + ',NOISE_KEY_PUB_' + Date.now() + ',ID_KEY_PUB_' + Date.now();
-      this.setQrCode(mockPayload, DEFAULT_QR_TTL);
-      dispatchNativeBridge('onRequestQr', { ref: mockRef });
+      state.qrPayload = null;
+      if (dom.qrSvgContainer) {
+        dom.qrSvgContainer.innerHTML = `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 240px; color: #8696a0; text-align: center; padding: 20px;">
+            <div class="transition-spinner"><div class="transition-spinner-circle"></div></div>
+            <div style="margin-top: 16px; font-size: 14px; font-weight: 600; color: #e9edef;">Menghubungkan ke WhatsApp...</div>
+            <div style="margin-top: 6px; font-size: 12px; color: #8696a0;">Mengambil kode QR resmi langsung dari server Meta</div>
+          </div>
+        `;
+      }
+      dispatchNativeBridge('onRequestQr', {});
     },
 
     // Submit phone number to request live 8-digit code from Meta
@@ -1221,21 +1229,20 @@
       // Clean digits for bridge / Meta API request
       const cleanDigits = phoneNumber.replace(/[^0-9]/g, '');
 
-      // Generate 8-character sample code as immediate initial value
-      const sampleCode = generateSamplePairingCode();
-      state.pairingCode = sampleCode;
-
       this.setState('pairing_code', {
         phoneNumber: phoneNumber,
-        pairingCode: sampleCode,
+        pairingCode: '........',
         ttl: DEFAULT_PAIRING_CODE_TTL
       });
+
+      if (dom.codePhoneTarget) {
+        dom.codePhoneTarget.innerHTML = 'Meminta kode 8-digit resmi dari WhatsApp untuk <strong>' + escapeHtml(phoneNumber) + '</strong>...';
+      }
 
       // Call bridge to request live 8-digit code from Meta
       dispatchNativeBridge('onRequestPairingCode', {
         phoneNumber: phoneNumber,
-        phone: cleanDigits,
-        code: sampleCode
+        phone: cleanDigits
       });
     },
 

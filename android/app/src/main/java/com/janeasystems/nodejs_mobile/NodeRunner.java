@@ -36,6 +36,7 @@ public class NodeRunner {
     static {
         try {
             System.loadLibrary("node");
+            System.loadLibrary("node_bridge");
             Log.i(TAG, "Native library 'node' loaded successfully.");
         } catch (UnsatisfiedLinkError e) {
             Log.e(TAG, "Failed to load native library 'node'", e);
@@ -56,41 +57,40 @@ public class NodeRunner {
 
     /**
      * Starts Node.js with the default project entry point (main.js).
+     * Delegates to the wired runtime so the EventListener registry and inbound
+     * event dispatching (auth_qr, auth_pairing_code, auth_paired, message,
+     * connection) stay active for NativeZapCore and WebBridge.
      */
     public static synchronized void startNode(Context context) {
-        startNode(context, "main.js");
+        com.hxdev.zapapp.NodeRunner.startNode(context);
     }
 
     /**
      * Starts Node.js with a specific script file inside the nodejs-project directory.
      */
     public static synchronized void startNode(Context context, String entryScript) {
-        if (nodeRunning) {
-            Log.w(TAG, "Node.js engine is already running in this process.");
-            return;
-        }
+        com.hxdev.zapapp.NodeRunner.startNode(context, entryScript);
+    }
 
-        final Context appContext = context.getApplicationContext();
-        final String filesDirPath = appContext.getFilesDir().getAbsolutePath();
-        final String projectPath = filesDirPath + "/" + NODE_PROJECT_DIR;
-        final String scriptPath = projectPath + "/" + entryScript;
+    /**
+     * Checks if the Node.js runtime thread is currently active.
+     */
+    public static boolean isRunning() {
+        return com.hxdev.zapapp.NodeRunner.isRunning();
+    }
 
-        // Ensure assets are extracted and up-to-date
-        try {
-            prepareNodeProjectAssets(appContext);
-        } catch (IOException e) {
-            Log.e(TAG, "Failed to unpack nodejs-project assets: " + e.getMessage(), e);
-            return;
-        }
+    /**
+     * Registers an inbound event listener on the shared registry.
+     */
+    public static void addEventListener(com.hxdev.zapapp.NodeRunner.EventListener listener) {
+        com.hxdev.zapapp.NodeRunner.addEventListener(listener);
+    }
 
-        // Configure system environment variables for Node runtime
-        setupEnvironment(appContext, projectPath);
-
-        List<String> argsList = new ArrayList<>();
-        argsList.add("node");
-        argsList.add(scriptPath);
-
-        startNodeWithArguments(appContext, argsList.toArray(new String[0]));
+    /**
+     * Removes a previously registered inbound event listener.
+     */
+    public static void removeEventListener(com.hxdev.zapapp.NodeRunner.EventListener listener) {
+        com.hxdev.zapapp.NodeRunner.removeEventListener(listener);
     }
 
     /**
@@ -122,13 +122,6 @@ public class NodeRunner {
 
         nodeThread.setDaemon(true);
         nodeThread.start();
-    }
-
-    /**
-     * Checks if the Node.js runtime thread is currently active.
-     */
-    public static boolean isRunning() {
-        return nodeRunning;
     }
 
     /**

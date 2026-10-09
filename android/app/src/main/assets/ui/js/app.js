@@ -210,17 +210,106 @@
     }
   }
 
+  // [xihanzu-NR] Real Calls Data Synchronization Mechanism
+  const callsStore = [];
+  function renderCalls(calls) {
+    const container = document.getElementById('calls-list-group');
+    const emptyState = document.getElementById('empty-calls-state');
+    if (!container) return;
+
+    if (!calls || calls.length === 0) {
+      if (emptyState) emptyState.style.display = 'block';
+      container.querySelectorAll('.list-item').forEach(function (el) { el.remove(); });
+      return;
+    }
+
+    if (emptyState) emptyState.style.display = 'none';
+    container.querySelectorAll('.list-item').forEach(function (el) { el.remove(); });
+
+    calls.forEach(function (call) {
+      const item = document.createElement('div');
+      item.className = 'list-item';
+      if (call.id) item.setAttribute('data-call-id', call.id);
+
+      const isVideo = Boolean(call.isVideo || call.type === 'video');
+      const isMissed = Boolean(call.status === 'missed' || call.missed);
+      const iconColor = isMissed ? '#ea0038' : '#00a884';
+      const iconSvg = isVideo
+        ? `<svg viewBox="0 0 24 24" width="16" height="16" fill="${iconColor}"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>`
+        : `<svg viewBox="0 0 24 24" width="16" height="16" fill="${iconColor}"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.44-5.15-3.75-6.59-6.59l1.97-1.57c.26-.26.35-.65.24-1.01A11.36 11.36 0 0 1 8.56 4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.62c0-.55-.45-1-.99-1z"/></svg>`;
+
+      item.innerHTML = `
+        <div class="avatar">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+          </svg>
+        </div>
+        <div class="item-content">
+          <div class="item-header">
+            <span class="item-title">${call.name || call.from || 'Kontak WhatsApp'}</span>
+            <span class="item-time">${call.time || call.timestamp || ''}</span>
+          </div>
+          <div class="item-sub" style="display:flex;align-items:center;gap:4px;">
+            ${iconSvg}
+            <span class="item-message" style="${isMissed ? 'color:#ea0038;' : ''}">${call.subtitle || (isMissed ? 'Panggilan tak terjawab' : (call.incoming ? 'Panggilan masuk' : 'Panggilan keluar'))}</span>
+          </div>
+        </div>
+      `;
+      container.appendChild(item);
+    });
+  }
+
+  window.ZapCalls = {
+    syncCalls: function (callsList) {
+      if (typeof callsList === 'string') {
+        try { callsList = JSON.parse(callsList); } catch (_) { callsList = []; }
+      }
+      callsStore.length = 0;
+      if (Array.isArray(callsList)) {
+        callsList.forEach(function (c) { callsStore.push(c); });
+      }
+      renderCalls(callsStore);
+    },
+    addCall: function (call) {
+      if (typeof call === 'string') {
+        try { call = JSON.parse(call); } catch (_) { return; }
+      }
+      if (call) {
+        callsStore.unshift(call);
+        renderCalls(callsStore);
+      }
+    },
+    getCalls: function () {
+      return [...callsStore];
+    }
+  };
+
+  // Bridge callbacks for Android WebView / Native events
+  window.onSyncCalls = function (payload) {
+    window.ZapCalls.syncCalls(payload);
+  };
+  window.addEventListener('zap:calls', function (e) {
+    if (e.detail) window.ZapCalls.syncCalls(e.detail);
+  });
+
   window.ZapAppInit = checkInitialAuth;
 
-  // Initialize default tab
-  switchTab('chats');
-
-  // Trigger Auth immediately on load
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () {
-      setTimeout(checkInitialAuth, 50);
-    });
+  // [xihanzu-NR] Cold-start auth gate: resolve the initial tab and pairing banner
+  // from pairing state before first paint so unauthenticated chats shell and
+  // unlinked warning banner never flash on cold start.
+  updatePairingBanner();
+  if (localStorage.getItem('zap_is_paired') === 'true') {
+    switchTab('chats');
   } else {
-    setTimeout(checkInitialAuth, 50);
+    tabPanels.forEach(function (panel) { panel.classList.remove('active'); });
+    tabButtons.forEach(function (btn) { btn.classList.remove('active'); });
+  }
+  // ponytail: static chrome (header/tabs) still fades behind the overlay on cold
+  // start; hide it or open the overlay without transition if that ever matters.
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkInitialAuth);
+  } else {
+    checkInitialAuth();
   }
 })();

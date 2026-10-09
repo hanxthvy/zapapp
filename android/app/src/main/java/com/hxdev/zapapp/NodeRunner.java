@@ -58,6 +58,7 @@ public final class NodeRunner {
     static {
         try {
             System.loadLibrary("node");
+            System.loadLibrary("node_bridge");
             Log.i(TAG, "Native library 'node' loaded successfully.");
         } catch (UnsatisfiedLinkError e) {
             Log.w(TAG, "Native library 'node' not loaded: " + e.getMessage());
@@ -97,6 +98,45 @@ public final class NodeRunner {
         if (listener != null) {
             eventListeners.remove(listener);
         }
+    }
+
+    /**
+     * Dispatches an inbound event to every registered listener, then forwards
+     * it to the NativeZapCore callbacks. Package-private so the wiring self-check
+     * can exercise the registry without a live IPC socket.
+     */
+    static void dispatchInboundEvent(String event, JSONObject data) {
+        for (EventListener listener : eventListeners) {
+            try {
+                listener.onEvent(event, data);
+            } catch (Exception e) {
+                Log.e(TAG, "Error in NodeRunner event listener", e);
+            }
+        }
+
+        // Forward to NativeZapCore callbacks if present
+        try {
+            if ("auth_qr".equals(event) || "qr_live".equals(event)) {
+                String qr = data.optString("qr", data.optString("payload", ""));
+                if (!qr.isEmpty()) NativeZapCore.dispatchQr(qr);
+            } else if ("auth_pairing_code".equals(event) || "pairing_code_live".equals(event)) {
+                String code = data.optString("formattedCode", data.optString("code", ""));
+                NativeZapCore.dispatchPairingState("pairing_code", code);
+            } else if ("auth_paired".equals(event)) {
+                String jid = data.optString("jid", data.optString("meJid", ""));
+                NativeZapCore.dispatchPairingState("paired", jid);
+            } else if ("message".equals(event)) {
+                String chatId = data.optString("chatId", "");
+                String id = data.optString("id", "");
+                String text = data.optString("text", data.optString("content", ""));
+                String type = data.optString("type", "text");
+                long ts = data.optLong("timestamp", System.currentTimeMillis());
+                NativeZapCore.dispatchMessage(chatId, id, text, type, ts);
+            } else if ("connection".equals(event)) {
+                String status = data.optString("status", "");
+                NativeZapCore.dispatchPairingState(status, data.toString());
+            }
+        } catch (Throwable ignored) {}
     }
 
     public static boolean isRunning() {
@@ -506,40 +546,6 @@ public final class NodeRunner {
             } catch (Exception e) {
                 Log.w(TAG, "Error parsing incoming IPC JSON: " + e.getMessage());
             }
-        }
-
-        private void dispatchInboundEvent(String event, JSONObject data) {
-            for (EventListener listener : eventListeners) {
-                try {
-                    listener.onEvent(event, data);
-                } catch (Exception e) {
-                    Log.e(TAG, "Error in NodeRunner event listener", e);
-                }
-            }
-
-            // Forward to NativeZapCore callbacks if present
-            try {
-                if ("auth_qr".equals(event) || "qr_live".equals(event)) {
-                    String qr = data.optString("qr", data.optString("payload", ""));
-                    if (!qr.isEmpty()) NativeZapCore.dispatchQr(qr);
-                } else if ("auth_pairing_code".equals(event) || "pairing_code_live".equals(event)) {
-                    String code = data.optString("formattedCode", data.optString("code", ""));
-                    NativeZapCore.dispatchPairingState("pairing_code", code);
-                } else if ("auth_paired".equals(event)) {
-                    String jid = data.optString("jid", data.optString("meJid", ""));
-                    NativeZapCore.dispatchPairingState("paired", jid);
-                } else if ("message".equals(event)) {
-                    String chatId = data.optString("chatId", "");
-                    String id = data.optString("id", "");
-                    String text = data.optString("text", data.optString("content", ""));
-                    String type = data.optString("type", "text");
-                    long ts = data.optLong("timestamp", System.currentTimeMillis());
-                    NativeZapCore.dispatchMessage(chatId, id, text, type, ts);
-                } else if ("connection".equals(event)) {
-                    String status = data.optString("status", "");
-                    NativeZapCore.dispatchPairingState(status, data.toString());
-                }
-            } catch (Throwable ignored) {}
         }
 
         private synchronized void closeSocket() {

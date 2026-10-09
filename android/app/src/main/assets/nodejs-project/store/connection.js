@@ -7,6 +7,28 @@ const { resolveFilesDir, getSessionDbPath } = require('./utils');
 
 const SQLITE_CONNECTION_CACHE = new Map();
 
+// [xihanzu-NR] Default PRAGMAs; options.pragmas overrides any of these per connection.
+const DEFAULT_PRAGMAS = {
+  journal_mode: 'WAL',
+  synchronous: 'NORMAL',
+  foreign_keys: 'ON',
+  busy_timeout: 5000
+};
+
+/**
+ * Merges caller-supplied pragmas over the defaults and rejects unsafe names/values
+ * (pragma keys/values are interpolated into SQL text).
+ */
+function resolvePragmas(overrides) {
+  const merged = { ...DEFAULT_PRAGMAS };
+  for (const [key, value] of Object.entries(overrides || {})) {
+    if (!/^[a-zA-Z_]+$/.test(key)) continue;
+    if (!/^[a-zA-Z0-9_]+$/.test(String(value))) continue;
+    merged[key] = value;
+  }
+  return merged;
+}
+
 /**
  * Checks if a Node module can be required without throwing error.
  */
@@ -32,9 +54,9 @@ function resolveDriver(requested) {
   if (canRequireModule('node:sqlite')) {
     return 'node';
   }
-  if (canRequireModule('sqlite3')) {
-    return 'sqlite3';
-  }
+  // [xihanzu-NR] 'sqlite3' is never auto-selected: its get/all API is callback-async and
+  // cannot satisfy the synchronous WaSqliteConnection contract (wrapConnection.get()
+  // would return the Database instance instead of query result rows).
   return 'pure-js';
 }
 
@@ -110,60 +132,52 @@ function wrapConnection(db, driver) {
 }
 
 /**
- * Opens SQLite connection and enforces WAL mode.
+ * Opens SQLite connection applying resolved PRAGMAs (WAL mode by default).
  */
 async function openSqliteConnection(options = {}, logger) {
   const dbPath = options.path || getSessionDbPath(options.filesDir);
   const driver = resolveDriver(options.driver);
+  const pragmas = resolvePragmas(options.pragmas);
 
-  const cacheKey = `${driver}|${dbPath}`;
+  const cacheKey = `${driver}|${dbPath}|${JSON.stringify(pragmas)}`;
   if (SQLITE_CONNECTION_CACHE.has(cacheKey)) {
     const cached = SQLITE_CONNECTION_CACHE.get(cacheKey);
     cached.refs++;
     return createConnectionHandle(cached, cacheKey);
   }
 
+  const pragmaStatements = Object.entries(pragmas).map(([key, value]) => `PRAGMA ${key} = ${value};`);
+
   let rawDb;
   if (driver === 'better-sqlite3') {
     const BetterSqlite3 = require('better-sqlite3');
     rawDb = new BetterSqlite3(dbPath);
-    rawDb.pragma('journal_mode = WAL');
-    rawDb.pragma('synchronous = NORMAL');
-    rawDb.pragma('foreign_keys = ON');
-    rawDb.pragma('busy_timeout = 5000');
+    for (const [key, value] of Object.entries(pragmas)) {
+      rawDb.pragma(`${key} = ${value}`);
+    }
   } else if (driver === 'node') {
     const { DatabaseSync } = require('node:sqlite');
     rawDb = new DatabaseSync(dbPath);
-    rawDb.exec('PRAGMA journal_mode = WAL;');
-    rawDb.exec('PRAGMA synchronous = NORMAL;');
-    rawDb.exec('PRAGMA foreign_keys = ON;');
-    rawDb.exec('PRAGMA busy_timeout = 5000;');
+    for (const statement of pragmaStatements) {
+      rawDb.exec(statement);
+    }
   } else if (driver === 'sqlite3') {
-    const sqlite3 = require('sqlite3').verbose();
-    const sdb = new sqlite3.Database(dbPath);
-    await new Promise((resolve, reject) => {
-      sdb.serialize(() => {
-        sdb.run('PRAGMA journal_mode = WAL;');
-        sdb.run('PRAGMA synchronous = NORMAL;');
-        sdb.run('PRAGMA foreign_keys = ON;');
-        sdb.run('PRAGMA busy_timeout = 5000;', (err) => {
-          if (err) reject(err); else resolve();
-        });
-      });
-    });
-    // Wrap callback-based sqlite3 to sync-like API using synchronous queries or in-memory snapshot
-    rawDb = sdb;
+    // [xihanzu-NR] sqlite3 uses async callbacks and cannot satisfy the synchronous
+    // WaSqliteConnection contract (wrapConnection.get/all would return the Database
+    // instance instead of query result rows). Use 'better-sqlite3', 'node', or 'pure-js'.
+    throw new Error(
+      "The 'sqlite3' driver uses asynchronous callbacks and cannot satisfy the synchronous WaSqliteConnection contract. Use 'better-sqlite3', 'node' (DatabaseSync), or 'pure-js'."
+    );
   } else {
-    // Pure JS SQLite Engine with WAL mode
+    // Pure JS SQLite Engine with resolved pragma settings
     rawDb = new PureJsSqliteEngine(dbPath, {
-      journalMode: 'wal',
-      synchronous: 'normal',
-      busyTimeout: 5000
+      journalMode: String(pragmas.journal_mode || 'wal').toLowerCase(),
+      synchronous: String(pragmas.synchronous || 'normal').toLowerCase(),
+      busyTimeout: parseInt(pragmas.busy_timeout, 10) || 5000
     });
-    rawDb.exec('PRAGMA journal_mode = WAL;');
-    rawDb.exec('PRAGMA synchronous = NORMAL;');
-    rawDb.exec('PRAGMA foreign_keys = ON;');
-    rawDb.exec('PRAGMA busy_timeout = 5000;');
+    for (const statement of pragmaStatements) {
+      rawDb.exec(statement);
+    }
   }
 
   const conn = wrapConnection(rawDb, driver);
@@ -174,7 +188,7 @@ async function openSqliteConnection(options = {}, logger) {
   SQLITE_CONNECTION_CACHE.set(cacheKey, entry);
 
   if (logger && typeof logger.info === 'function') {
-    logger.info('SQLite storage connection established', { path: dbPath, driver, journalMode: 'WAL' });
+    logger.info('SQLite storage connection established', { path: dbPath, driver, journalMode: pragmas.journal_mode });
   }
 
   return createConnectionHandle(entry, cacheKey);

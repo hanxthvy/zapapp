@@ -18,7 +18,7 @@ import android.os.IBinder;
 import android.os.PowerManager;
 import android.util.Log;
 
-import com.janeasystems.nodejs_mobile.NodeRunner;
+import org.json.JSONObject;
 
 /**
  * Sticky Foreground Service for ZapApp.
@@ -54,6 +54,7 @@ public class ZapForegroundService extends Service {
     private PowerManager.WakeLock wakeLock;
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
+    private NodeRunner.EventListener nodeEventListener;
 
     @Override
     public void onCreate() {
@@ -63,6 +64,7 @@ public class ZapForegroundService extends Service {
         initWakeLock();
         acquireWakeLock();
         registerNetworkCallback();
+        setupNodeEventListener();
         startNodeRunner();
     }
 
@@ -101,7 +103,40 @@ public class ZapForegroundService extends Service {
         isRunning = false;
         releaseWakeLock();
         unregisterNetworkCallback();
+        if (nodeEventListener != null) {
+            NodeRunner.removeEventListener(nodeEventListener);
+            nodeEventListener = null;
+        }
         super.onDestroy();
+    }
+
+    /**
+     * Registers the service-scoped NodeRunner event listener.
+     * Keeps NativeZapCore callbacks and the NodeRunner registry wired while the
+     * service runs, so inbound events (auth_qr, auth_pairing_code, auth_paired,
+     * message, connection) still dispatch when MainActivity is not alive.
+     */
+    private void setupNodeEventListener() {
+        if (nodeEventListener != null) return;
+        nodeEventListener = new NodeRunner.EventListener() {
+            @Override
+            public void onEvent(String event, JSONObject data) {
+                if (data == null) return;
+                try {
+                    Log.d(TAG, "Inbound NodeRunner event: " + event);
+                    if ("connection".equals(event)) {
+                        String status = data.optString("status", "");
+                        isNetworkConnected = "open".equalsIgnoreCase(status)
+                                || "connected".equalsIgnoreCase(status)
+                                || "paired".equalsIgnoreCase(status);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in service NodeRunner event handler: " + event, e);
+                }
+            }
+        };
+        NodeRunner.addEventListener(nodeEventListener);
+        Log.d(TAG, "Service NodeRunner event listener registered.");
     }
 
     /**

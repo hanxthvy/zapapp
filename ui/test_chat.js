@@ -84,6 +84,7 @@ class MockElement {
     this.dispatchEvent({ type: 'click', stopPropagation: () => {} });
   }
   focus() {}
+  insertAdjacentHTML(pos, html) { this.innerHTML += html; }
   scrollTo() {}
   querySelector(sel) {
     return this.querySelectorAll(sel)[0] || null;
@@ -138,11 +139,12 @@ global.document = {
   querySelectorAll: (sel) => rootDoc.querySelectorAll(sel)
 };
 
-global.navigator = {
+const mockNavigator = {
   clipboard: {
-    writeText: async (text) => { global.navigator._copiedText = text; }
+    writeText: async (text) => { mockNavigator._copiedText = text; }
   }
 };
+Object.defineProperty(global, 'navigator', { value: mockNavigator, configurable: true, writable: true });
 
 global.requestAnimationFrame = (cb) => cb();
 
@@ -195,7 +197,7 @@ registerElements(appEl);
 const chatView = document.getElementById('chat-view');
 assert(chatView && chatView.classList.contains('active'), 'Chat view must be active');
 const msgs = window.ZapChat.getMessages('engineering_core');
-assert(msgs.length >= 4, 'Should load initial seed messages');
+assert.strictEqual(msgs.length, 0, 'Should start with 0 messages before sync');
 console.log('  [PASS] openChat successfully renders view');
 
 // 3. Test sending message
@@ -227,8 +229,8 @@ assert(receivedMsg, 'Received message must be stored');
 console.log('  [PASS] receiveMessage inbound with Native Flow buttons');
 
 // 5. Test Status Update
-window.ZapChat.updateMessageStatus('msg_104', 'read');
-const msg104 = window.ZapChat.getMessages('engineering_core').find(m => m.id === 'msg_104');
+window.ZapChat.updateMessageStatus('msg_test_btns', 'read');
+const msg104 = window.ZapChat.getMessages('engineering_core').find(m => m.id === 'msg_test_btns');
 assert.strictEqual(msg104.status, 'read', 'Status should be updated to read');
 console.log('  [PASS] updateMessageStatus updates tick to read');
 

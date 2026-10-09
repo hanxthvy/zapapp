@@ -90,7 +90,9 @@ class WaSessionSqliteStore {
         server,
         device,
         record
-      ) VALUES (?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(session_id, user, server, device)
+      DO UPDATE SET record = excluded.record`,
       [
         this.sessionId,
         target.user,
@@ -115,7 +117,9 @@ class WaSessionSqliteStore {
             server,
             device,
             record
-          ) VALUES (?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(session_id, user, server, device)
+          DO UPDATE SET record = excluded.record`,
           [
             this.sessionId,
             target.user,

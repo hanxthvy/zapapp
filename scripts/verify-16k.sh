@@ -66,6 +66,8 @@ check_binary() {
 for abi in arm64-v8a x86_64; do
     check_binary "$JNI_DIR/$abi/libzapapp_core.so" "$abi"
     check_binary "$JNI_DIR/$abi/libnode.so" "$abi"
+    check_binary "$JNI_DIR/$abi/libnode_bridge.so" "$abi"
+    check_binary "$JNI_DIR/$abi/libc++_shared.so" "$abi"
 done
 
 if [ "$FAIL" -eq 0 ]; then

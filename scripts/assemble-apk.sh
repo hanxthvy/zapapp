@@ -21,7 +21,8 @@ APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
 SRC_JAVA_DIR="$PROJECT_ROOT/android/app/src/main/java"
 SRC_RES_DIR="$PROJECT_ROOT/android/app/src/main/res"
 SRC_MANIFEST="$PROJECT_ROOT/android/app/src/main/AndroidManifest.xml"
-SRC_UI_DIR="$PROJECT_ROOT/ui"
+SRC_UI_DIR="$PROJECT_ROOT/android/app/src/main/assets/ui"
+SRC_UI_ROOT="$PROJECT_ROOT/ui"
 SRC_NODE_DIR="$PROJECT_ROOT/android/app/src/main/assets/nodejs-project"
 SRC_JNI_DIR="$PROJECT_ROOT/android/app/src/main/jniLibs"
 
@@ -72,11 +73,31 @@ echo "Step 3: Compiling Android resources with aapt2..."
 "$AAPT2" compile --dir "$SRC_RES_DIR" -o "$RES_COMPILED/resources.zip"
 
 # 5. Prepare assets (UI + nodejs-project)
+# [xihanzu-NR] Verify asset alignment, prevent stale assets & mock data
 echo "Step 4: Staging UI assets and nodejs-project runtime..."
+cp -rf "$SRC_UI_DIR"/* "$SRC_UI_ROOT/" 2>/dev/null || true
 cp -rf "$SRC_UI_DIR"/* "$STAGING_ASSETS/ui/"
 rm -f "$STAGING_ASSETS/ui"/test_*.js
 cp -f "$SRC_UI_DIR/index.html" "$STAGING_ASSETS/index.html"
 cp -rf "$SRC_NODE_DIR"/* "$STAGING_ASSETS/nodejs-project/"
+
+# Verification: Assert no mock data in staged assets
+if grep -q "Engineering Core" "$STAGING_ASSETS/ui/index.html"; then
+    echo "ERROR: Mock chats detected in index.html! Aborting assembly." >&2
+    exit 1
+fi
+if grep -q "mockPayload = mockRef" "$STAGING_ASSETS/ui/js/auth.js"; then
+    echo "ERROR: Stale mock auth payload detected in auth.js! Aborting assembly." >&2
+    exit 1
+fi
+if grep -q "Rust client protocol compilation verified" "$STAGING_ASSETS/ui/js/chat.js"; then
+    echo "ERROR: Mock chat messages detected in chat.js! Aborting assembly." >&2
+    exit 1
+fi
+if grep -q "Incoming voice call" "$STAGING_ASSETS/ui/index.html"; then
+    echo "ERROR: Mock calls detected in index.html! Aborting assembly." >&2
+    exit 1
+fi
 
 # 6. Link APK with aapt2 including assets
 echo "Step 5: Linking base APK with aapt2 link..."
@@ -95,10 +116,17 @@ zip -uj "$BUILD_DIR/zapapp_unaligned.apk" "$DEX_DIR/classes.dex"
 
 # 8. Bundle jniLibs (arm64-v8a + x86_64) uncompressed (-0)
 echo "Step 7: Bundling uncompressed (-0) jniLibs for 16KB compliance..."
-cp -f "$SRC_JNI_DIR/arm64-v8a/libnode.so" "$STAGING_LIBS/lib/arm64-v8a/"
-cp -f "$SRC_JNI_DIR/arm64-v8a/libzapapp_core.so" "$STAGING_LIBS/lib/arm64-v8a/"
-cp -f "$SRC_JNI_DIR/x86_64/libnode.so" "$STAGING_LIBS/lib/x86_64/"
-cp -f "$SRC_JNI_DIR/x86_64/libzapapp_core.so" "$STAGING_LIBS/lib/x86_64/"
+# [xihanzu-NR] node_bridge.so + its DT_NEEDED libc++_shared.so must ship together,
+# else System.loadLibrary("node_bridge") throws UnsatisfiedLinkError at dlopen.
+for abi in arm64-v8a x86_64; do
+    for lib in libnode.so libnode_bridge.so libzapapp_core.so libc++_shared.so; do
+        if [ ! -f "$SRC_JNI_DIR/$abi/$lib" ]; then
+            echo "ERROR: Missing required native library $SRC_JNI_DIR/$abi/$lib" >&2
+            exit 1
+        fi
+        cp -f "$SRC_JNI_DIR/$abi/$lib" "$STAGING_LIBS/lib/$abi/"
+    done
+done
 
 (cd "$STAGING_LIBS" && zip -ur -0 "$BUILD_DIR/zapapp_unaligned.apk" lib)
 

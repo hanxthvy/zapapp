@@ -142,7 +142,14 @@ class WaMessageSqliteStore {
         from_me,
         timestamp_ms,
         message_bytes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(session_id, message_id) DO UPDATE SET
+        thread_jid = excluded.thread_jid,
+        sender_jid = excluded.sender_jid,
+        participant_jid = excluded.participant_jid,
+        from_me = excluded.from_me,
+        timestamp_ms = excluded.timestamp_ms,
+        message_bytes = excluded.message_bytes`,
       [
         this.sessionId,
         record.id,

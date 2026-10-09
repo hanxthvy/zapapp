@@ -8,81 +8,7 @@
   let activeChat = null;
   const messageStore = {};
 
-  // Sample seed messages showcasing Native Flow buttons and tick statuses
-  messageStore['engineering_core'] = [
-    {
-      id: 'msg_101',
-      chatId: 'engineering_core',
-      fromMe: false,
-      text: 'Rust client protocol compilation verified on Android arm64 targets.',
-      timestamp: Date.now() - 3600000,
-      status: 'read'
-    },
-    {
-      id: 'msg_102',
-      chatId: 'engineering_core',
-      fromMe: true,
-      text: 'Noise XX handshake and protobuf binary frame roundtrip tests passing 100%.',
-      timestamp: Date.now() - 3000000,
-      status: 'read'
-    },
-    {
-      id: 'msg_103',
-      chatId: 'engineering_core',
-      fromMe: false,
-      text: 'Interactive Native Flow buttons activated. Select an action below:',
-      timestamp: Date.now() - 1800000,
-      status: 'read',
-      buttons: [
-        {
-          type: 'quick_reply',
-          display_text: 'Confirm Sync',
-          id: 'qr_confirm_sync'
-        },
-        {
-          type: 'cta_url',
-          display_text: 'View Protocol Spec',
-          url: 'https://github.com/zapapp/protocol'
-        },
-        {
-          type: 'cta_copy',
-          display_text: 'Copy Session Key',
-          copy_code: 'ZAP-SEC-9X4F-2026'
-        }
-      ]
-    },
-    {
-      id: 'msg_104',
-      chatId: 'engineering_core',
-      fromMe: true,
-      text: 'Verified native flow button handlers and bridge message dispatch.',
-      timestamp: Date.now() - 600000,
-      status: 'delivered'
-    }
-  ];
-
-  messageStore['devops_bot'] = [
-    {
-      id: 'msg_201',
-      chatId: 'devops_bot',
-      fromMe: false,
-      text: 'Gateway container deployment healthy. All metrics nominal.',
-      timestamp: Date.now() - 5400000,
-      status: 'read',
-      buttons: [
-        {
-          type: 'quick_reply',
-          display_text: 'Restart Service',
-          id: 'qr_restart_svc'
-        },
-        {
-          type: 'cta_copy',
-          display_text: 'Copy Deployment ID',
-          copy_code: 'dep-zap-prod-8812'
-        }
-      ]
-    }
-  ];
+  // Message store populated dynamically by live WhatsApp sync
 
   // SVG Icons
   const ICONS = {
@@ -298,10 +224,10 @@
     ta.style.position = 'fixed';
     ta.style.opacity = '0';
     document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
+    if (typeof ta.focus === 'function') ta.focus();
+    if (typeof ta.select === 'function') ta.select();
     try {
-      document.execCommand('copy');
+      if (typeof document.execCommand === 'function') document.execCommand('copy');
     } catch (e) {
       console.warn('Copy fallback failed:', e);
     }
@@ -1054,18 +980,17 @@
   // Wire list item clicks in Chat tab to open chat view
   function wireChatListItems() {
     const chatItems = document.querySelectorAll('#tab-chats .list-item');
-    const defaultIds = ['engineering_core', 'devops_bot', 'support_team', 'platform_arch'];
 
     chatItems.forEach(function (item, idx) {
       const title = item.querySelector('.item-title')?.textContent || 'Contact';
-      const id = defaultIds[idx] || ('chat_' + idx);
+      const id = item.getAttribute('data-chat-id') || ('chat_' + idx);
       item.setAttribute('data-chat-id', id);
 
       item.addEventListener('click', function () {
         window.ZapChat.openChat({
           id: id,
           name: title,
-          status: id === 'engineering_core' ? 'online' : (id === 'devops_bot' ? 'automated bot' : 'last seen recently')
+          status: 'online'
         });
       });
     });

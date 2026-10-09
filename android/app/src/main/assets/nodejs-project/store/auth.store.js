@@ -154,7 +154,36 @@ class WaAuthSqliteStore {
           mem_class
         ) VALUES (
           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-        )`,
+        )
+        ON CONFLICT(session_id) DO UPDATE SET
+          noise_pub_key=excluded.noise_pub_key,
+          noise_priv_key=excluded.noise_priv_key,
+          registration_id=excluded.registration_id,
+          identity_pub_key=excluded.identity_pub_key,
+          identity_priv_key=excluded.identity_priv_key,
+          signed_prekey_id=excluded.signed_prekey_id,
+          signed_prekey_pub_key=excluded.signed_prekey_pub_key,
+          signed_prekey_priv_key=excluded.signed_prekey_priv_key,
+          signed_prekey_signature=excluded.signed_prekey_signature,
+          adv_secret_key=excluded.adv_secret_key,
+          signed_identity=excluded.signed_identity,
+          me_jid=excluded.me_jid,
+          me_lid=excluded.me_lid,
+          me_display_name=excluded.me_display_name,
+          companion_enc_static=excluded.companion_enc_static,
+          platform=excluded.platform,
+          server_static_key=excluded.server_static_key,
+          server_has_prekeys=excluded.server_has_prekeys,
+          routing_info=excluded.routing_info,
+          last_success_ts=excluded.last_success_ts,
+          props_version=excluded.props_version,
+          ab_props_version=excluded.ab_props_version,
+          connection_location=excluded.connection_location,
+          account_creation_ts=excluded.account_creation_ts,
+          device_info=excluded.device_info,
+          push_name=excluded.push_name,
+          year_class=excluded.year_class,
+          mem_class=excluded.mem_class`,
         [
           this.sessionId,
           credentials.noiseKeyPair.pubKey,

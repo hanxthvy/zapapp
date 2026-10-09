@@ -58,7 +58,9 @@ class WaIdentitySqliteStore {
         server,
         device,
         identity_key
-      ) VALUES (?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(session_id, user, server, device)
+      DO UPDATE SET identity_key = excluded.identity_key`,
       [
         this.sessionId,
         target.user,
@@ -83,7 +85,9 @@ class WaIdentitySqliteStore {
             server,
             device,
             identity_key
-          ) VALUES (?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(session_id, user, server, device)
+          DO UPDATE SET identity_key = excluded.identity_key`,
           [
             this.sessionId,
             target.user,
