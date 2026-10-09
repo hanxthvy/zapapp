@@ -54,6 +54,39 @@ public class WebBridge implements NativeZapCore.EventListener, NodeRunner.EventL
         executor.shutdown();
     }
 
+    /**
+     * Replays the most recently cached QR / pairing code / state into the WebView.
+     * Called from onPageFinished: a QR emitted by NodeRunner before the page finished
+     * loading would otherwise be lost, leaving the UI stuck on its loading spinner.
+     */
+    public void replayToWebView() {
+        final String qr = lastDispatchedQr;
+        final String code = lastDispatchedCode;
+        final String state = lastDispatchedState;
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                WebView wv = webViewRef.get();
+                if (wv == null) return;
+                if (qr != null && !qr.isEmpty()) {
+                    wv.evaluateJavascript(
+                        "(function(){ if(typeof window.onQrReceived === 'function') window.onQrReceived("
+                            + JSONObject.quote(qr) + "); })();", null);
+                }
+                if (code != null && !code.isEmpty()) {
+                    wv.evaluateJavascript(
+                        "(function(){ if(typeof window.onPairingCodeReceived === 'function') window.onPairingCodeReceived("
+                            + JSONObject.quote(code) + "); })();", null);
+                }
+                if (state != null && !state.isEmpty()) {
+                    wv.evaluateJavascript(
+                        "(function(){ if(typeof window.onPairingStateUpdate === 'function') window.onPairingStateUpdate("
+                            + JSONObject.quote(state) + "); })();", null);
+                }
+            }
+        });
+    }
+
     // -------------------------------------------------------------------------
     // Core JS-to-Native Bridge Handlers
     // -------------------------------------------------------------------------

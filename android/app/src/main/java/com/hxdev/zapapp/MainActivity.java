@@ -59,9 +59,6 @@ public class MainActivity extends Activity {
         // Ensure background persistent service is active
         ZapForegroundService.start(this);
 
-        // Start embedded NodeRunner runtime for background WhatsApp engine & IPC
-        NodeRunner.start(this);
-
         // Setup WebView host
         FrameLayout rootLayout = new FrameLayout(this);
         rootLayout.setLayoutParams(new ViewGroup.LayoutParams(
@@ -83,6 +80,10 @@ public class MainActivity extends Activity {
         setupWebViewSettings();
         setupJavaScriptBridge();
         setupNodeRunnerWiring();
+
+        // Start embedded NodeRunner AFTER listeners and JS bridge are ready
+        NodeRunner.start(this);
+
         loadLocalUiAssets();
     }
 
@@ -159,6 +160,15 @@ public class MainActivity extends Activity {
                     "})();";
                 if (view != null) {
                     view.evaluateJavascript(polyfillJs, null);
+                }
+
+                // Replay any QR / pairing code NodeRunner emitted while the page was loading,
+                // then ask the engine for the current QR in case none has arrived yet.
+                if (webBridge != null) {
+                    webBridge.replayToWebView();
+                }
+                if (nodeEventListener != null) {
+                    NodeRunner.sendCommand("request_qr", new JSONObject(), null);
                 }
             }
         });

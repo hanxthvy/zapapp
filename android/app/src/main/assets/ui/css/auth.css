@@ -501,6 +501,17 @@
   background-color: rgba(0, 168, 132, 0.08);
 }
 
+.code-box.pending {
+  color: var(--text-secondary);
+  opacity: 0.6;
+  animation: codePendingPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes codePendingPulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.96); }
+  50% { opacity: 0.9; transform: scale(1.02); }
+}
+
 .code-boxes-separator {
   width: 12px;
   height: 2px;

@@ -414,9 +414,6 @@
         <section class="pairing-section active" id="pairing-section-qr">
           <div class="qr-card-wrapper">
             <div class="qr-code-svg-container" id="qr-code-svg-container"></div>
-            <div class="qr-center-logo">
-              ${ICONS.zapLogo}
-            </div>
             <div class="qr-expired-overlay" id="qr-expired-overlay">
               <div class="qr-expired-title">QR Code Expired</div>
               <button class="qr-reload-btn" id="qr-reload-btn">
@@ -776,15 +773,17 @@
   // [xihanzu-NR] Live official Meta pairing code rendering only
 
   function renderPairingCode(code) {
-    const clean = String(code || '--------').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-    const chars = clean.padEnd(8, '-').slice(0, 8);
+    const isPending = !code || code === '........' || code === '--------';
+    const clean = String(code || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const chars = clean.length === 8 ? clean : clean.padEnd(8, '•').slice(0, 8);
 
     for (let i = 0; i < 8; i++) {
       const box = document.getElementById('code-char-' + i);
       if (box) {
-        const ch = chars[i];
+        const ch = isPending ? '•' : chars[i];
         box.textContent = ch;
-        box.classList.toggle('filled', ch !== '-');
+        box.classList.toggle('filled', !isPending && ch !== '•');
+        box.classList.toggle('pending', isPending);
       }
     }
   }
