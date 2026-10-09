@@ -331,6 +331,30 @@
         <button type="button" class="zapo-btn-send" id="zapo-modal-submit-btn">Kirim Tombol Sekarang</button>
       </div>
     </div>
+
+    <!-- [xihanzu-NR] In-App Engine Diagnostics Console (no ADB required) -->
+    <div class="zapo-modal-overlay" id="zap-diag-modal" role="dialog" aria-modal="true" aria-labelledby="zap-diag-title">
+      <div class="zapo-modal-sheet">
+        <div class="zapo-modal-header">
+          <div class="zapo-modal-title" id="zap-diag-title">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20 8h-2.81a5.985 5.985 0 0 0-1.82-1.96L17 4.41 15.59 3l-2.17 2.17a6.02 6.02 0 0 0-2.83 0L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.17 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/></svg>
+            <span>Status Engine &amp; Log</span>
+          </div>
+          <button type="button" class="zapo-modal-close" id="zap-diag-close-btn" aria-label="Tutup">&times;</button>
+        </div>
+
+        <div id="zap-diag-status" style="background:#1f2c34;border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;line-height:1.6;color:#e9edef;">
+          <div>Memuat status...</div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <button type="button" class="zapo-btn-send" id="zap-diag-refresh" style="flex:1;padding:10px;font-size:13px;">Refresh</button>
+          <button type="button" class="zapo-btn-send" id="zap-diag-copy" style="flex:1;padding:10px;font-size:13px;background:#202c33;color:#e9edef;">Copy Log</button>
+        </div>
+
+        <pre id="zap-diag-log" style="background:#0b141a;color:#8696a0;border-radius:8px;padding:10px;font-size:10.5px;line-height:1.5;max-height:38vh;overflow:auto;white-space:pre-wrap;word-break:break-all;margin:0;"></pre>
+      </div>
+    </div>
   </div>
 
   <script src="js/auth.js"></script>

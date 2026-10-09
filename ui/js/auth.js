@@ -455,6 +455,10 @@
           <button class="pairing-switch-link" id="qr-switch-phone-link">
             Tautkan dengan nomor telepon saja &rarr;
           </button>
+
+          <button type="button" class="pairing-switch-link" id="zap-diag-open-link" style="margin-top:8px;color:#8696a0;font-size:11px;opacity:0.8;">
+            &#9881;&#65039; Periksa Status Engine &amp; Log
+          </button>
         </section>
 
         <!-- Section 2: Phone Input Form -->
@@ -671,6 +675,14 @@
     if (dom.qrSwitchPhoneLink) {
       dom.qrSwitchPhoneLink.addEventListener('click', function () {
         window.ZapAuth.switchMethod('phone');
+      });
+    }
+
+    // [xihanzu-NR] In-app diagnostics console (no ADB needed)
+    var diagOpenLink = (dom.view || document).querySelector('#zap-diag-open-link');
+    if (diagOpenLink) {
+      diagOpenLink.addEventListener('click', function () {
+        openDiagModal();
       });
     }
 
@@ -979,6 +991,137 @@
       else if (i + 1 === activeIdx) dot.classList.add('active');
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // In-App Diagnostics Console (reads NodeRunner status/logs via the JS bridge)
+  // ---------------------------------------------------------------------------
+
+  function bridgeCall(action, fallback) {
+    try {
+      if (window.ZapBridge && typeof window.ZapBridge[action] === 'function') {
+        return window.ZapBridge[action]();
+      }
+      if (window.Android && typeof window.Android[action] === 'function') {
+        return window.Android[action]();
+      }
+      if (window.ZapNative && typeof window.ZapNative[action] === 'function') {
+        return window.ZapNative[action]();
+      }
+    } catch (err) {
+      return '[bridge error] ' + (err && err.message ? err.message : err);
+    }
+    return fallback;
+  }
+
+  function renderDiagStatus(rawStatus) {
+    const box = document.getElementById('zap-diag-status');
+    if (!box) return;
+
+    let st = null;
+    try {
+      st = typeof rawStatus === 'string' ? JSON.parse(rawStatus) : rawStatus;
+    } catch (_) {
+      st = null;
+    }
+
+    if (!st || typeof st !== 'object') {
+      box.innerHTML = '<div style="color:#ea4335;">Tidak dapat membaca status engine. Bridge tidak tersedia di lingkungan ini.</div>';
+      return;
+    }
+
+    function row(label, value, good) {
+      const color = good === undefined ? '#e9edef' : (good ? '#00a884' : '#ea4335');
+      return '<div style="display:flex;justify-content:space-between;gap:8px;">' +
+             '<span style="color:#8696a0;">' + label + '</span>' +
+             '<span style="color:' + color + ';font-weight:600;text-align:right;">' + value + '</span></div>';
+    }
+
+    const running = st.nodeRunning === true;
+    const ipc = st.ipcConnected === true;
+    const loadErr = st.nativeLoadError || '';
+    const exitCode = st.lastExitCode;
+    const exitBad = typeof exitCode === 'number' && exitCode !== 0 && exitCode !== -2147483648;
+
+    let html = '';
+    html += row('Engine Node.js', running ? 'BERJALAN' : 'BERHENTI', running);
+    html += row('IPC Socket :28789', ipc ? 'TERHUBUNG' : 'TERPUTUS', ipc);
+    if (loadErr) {
+      html += row('Native lib', 'GAGAL DIMUAT', false);
+      html += '<div style="color:#ea4335;font-size:10.5px;margin-top:4px;word-break:break-all;">' + loadErr + '</div>';
+    } else {
+      html += row('Native lib', 'OK', true);
+    }
+    if (exitCode !== undefined && exitCode !== -2147483648) {
+      html += row('Exit code', String(exitCode), !exitBad);
+    }
+    html += row('Event terakhir', (st.lastEvent || 'belum ada'), st.lastEvent ? true : false);
+    html += row('Baris log', String(st.logLines || 0));
+    if (st.lastNodeError) {
+      html += '<div style="color:#ea4335;font-size:10.5px;margin-top:4px;word-break:break-all;">Error: ' + st.lastNodeError + '</div>';
+    }
+    box.innerHTML = html;
+  }
+
+  function refreshDiag() {
+    renderDiagStatus(bridgeCall('getEngineStatus', null));
+    const logEl = document.getElementById('zap-diag-log');
+    if (logEl) {
+      const logs = bridgeCall('getRuntimeLogs', '[log tidak tersedia: bridge tidak aktif]');
+      logEl.textContent = logs || '(kosong)';
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+  }
+
+  let diagTimer = null;
+
+  function openDiagModal() {
+    const modal = document.getElementById('zap-diag-modal');
+    if (!modal) return;
+    modal.classList.add('active');
+    refreshDiag();
+    if (diagTimer) clearInterval(diagTimer);
+    diagTimer = setInterval(refreshDiag, 1500);
+  }
+
+  function closeDiagModal() {
+    const modal = document.getElementById('zap-diag-modal');
+    if (modal) modal.classList.remove('active');
+    if (diagTimer) {
+      clearInterval(diagTimer);
+      diagTimer = null;
+    }
+  }
+
+  (function bindDiagModal() {
+    function bind() {
+      const closeBtn = document.getElementById('zap-diag-close-btn');
+      const refreshBtn = document.getElementById('zap-diag-refresh');
+      const copyBtn = document.getElementById('zap-diag-copy');
+      const modal = document.getElementById('zap-diag-modal');
+
+      if (closeBtn) closeBtn.addEventListener('click', closeDiagModal);
+      if (refreshBtn) refreshBtn.addEventListener('click', refreshDiag);
+      if (copyBtn) {
+        copyBtn.addEventListener('click', function () {
+          const logEl = document.getElementById('zap-diag-log');
+          const text = logEl ? logEl.textContent : '';
+          dispatchNativeBridge('copyToClipboard', { text: text });
+          copyBtn.textContent = 'Tersalin!';
+          setTimeout(function () { copyBtn.textContent = 'Copy Log'; }, 1500);
+        });
+      }
+      if (modal) {
+        modal.addEventListener('click', function (e) {
+          if (e.target === modal) closeDiagModal();
+        });
+      }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', bind);
+    } else {
+      bind();
+    }
+  })();
 
   // ---------------------------------------------------------------------------
   // Public Window API

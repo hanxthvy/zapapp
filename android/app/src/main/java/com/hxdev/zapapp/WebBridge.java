@@ -279,6 +279,38 @@ public class WebBridge implements NativeZapCore.EventListener, NodeRunner.EventL
     }
 
     // -------------------------------------------------------------------------
+    // In-App Diagnostics (readable from the WebView without ADB)
+    // -------------------------------------------------------------------------
+
+    /** Last N lines of engine log captured in-process by NodeRunner. */
+    @JavascriptInterface
+    public String getRuntimeLogs() {
+        try {
+            return NodeRunner.getRuntimeLogTail();
+        } catch (Exception e) {
+            return "[log unavailable] " + e.getMessage();
+        }
+    }
+
+    /** Live engine status: library load, thread state, IPC socket, last event. */
+    @JavascriptInterface
+    public String getEngineStatus() {
+        try {
+            return NodeRunner.getEngineStatus().toString();
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    /** Clears the in-process engine log buffer. */
+    @JavascriptInterface
+    public void clearRuntimeLogs() {
+        try {
+            NodeRunner.clearRuntimeLog();
+        } catch (Exception ignored) {}
+    }
+
+    // -------------------------------------------------------------------------
     // NodeRunner EventListener Implementation
     // -------------------------------------------------------------------------
 

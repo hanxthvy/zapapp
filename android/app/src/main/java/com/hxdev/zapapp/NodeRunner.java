@@ -53,6 +53,63 @@ public final class NodeRunner {
     private static Thread nodeThread = null;
     private static IpcClient ipcClient = null;
 
+    // -------------------------------------------------------------------------
+    // In-process diagnostics: ring buffer + status, readable from the WebView
+    // without ADB. Keeps the last LOG_CAPACITY lines emitted by the engine.
+    // -------------------------------------------------------------------------
+    private static final int LOG_CAPACITY = 200;
+    private static final java.util.Deque<String> logBuffer =
+        new java.util.concurrent.ConcurrentLinkedDeque<>();
+    private static volatile String nativeLoadError = null;
+    private static volatile String lastEventName = null;
+    private static volatile long lastEventAt = 0L;
+    private static volatile String lastNodeError = null;
+    private static volatile int lastExitCode = Integer.MIN_VALUE;
+
+    public static void appendLog(String line) {
+        if (line == null) return;
+        logBuffer.addLast(line);
+        while (logBuffer.size() > LOG_CAPACITY) {
+            logBuffer.pollFirst();
+        }
+    }
+
+    public static String getRuntimeLogTail() {
+        StringBuilder sb = new StringBuilder();
+        for (String l : logBuffer) {
+            sb.append(l).append('\n');
+        }
+        return sb.toString();
+    }
+
+    public static void clearRuntimeLog() {
+        logBuffer.clear();
+    }
+
+    public static void noteEvent(String event) {
+        lastEventName = event;
+        lastEventAt = System.currentTimeMillis();
+    }
+
+    public static void noteNodeError(String message) {
+        lastNodeError = message;
+    }
+
+    public static JSONObject getEngineStatus() {
+        JSONObject o = new JSONObject();
+        try {
+            o.put("nodeRunning", nodeRunning);
+            o.put("nativeLoadError", nativeLoadError != null ? nativeLoadError : "");
+            o.put("lastExitCode", lastExitCode);
+            o.put("ipcConnected", ipcClient != null && ipcClient.isConnected());
+            o.put("lastEvent", lastEventName != null ? lastEventName : "");
+            o.put("lastEventAt", lastEventAt);
+            o.put("lastNodeError", lastNodeError != null ? lastNodeError : "");
+            o.put("logLines", logBuffer.size());
+        } catch (Exception ignored) {}
+        return o;
+    }
+
     // ponytail: Local TCP loopback socket used for IPC; upgrade to Unix Domain LocalSocket if inter-process isolation strictly required.
 
     static {
@@ -60,8 +117,11 @@ public final class NodeRunner {
             System.loadLibrary("node");
             System.loadLibrary("node_bridge");
             Log.i(TAG, "Native library 'node' loaded successfully.");
+            appendLog("[NodeRunner] Native libraries 'node' and 'node_bridge' loaded.");
         } catch (UnsatisfiedLinkError e) {
+            nativeLoadError = e.getMessage();
             Log.w(TAG, "Native library 'node' not loaded: " + e.getMessage());
+            appendLog("[NodeRunner] Native library load FAILED: " + e.getMessage());
         }
         try {
             System.loadLibrary("zapapp_core");
@@ -196,20 +256,28 @@ public final class NodeRunner {
                     String[] args = argsList.toArray(new String[0]);
 
                     Log.i(TAG, "Starting Node.js engine with: " + Arrays.toString(args));
+                    appendLog("[NodeRunner] Starting: " + Arrays.toString(args));
                     int exitCode = 0;
                     try {
                         exitCode = startNodeWithArguments(args);
                     } catch (UnsatisfiedLinkError ule) {
                         Log.w(TAG, "Local startNodeWithArguments symbol unbound, trying fallback: " + ule.getMessage());
+                        appendLog("[NodeRunner] JNI unbound: " + ule.getMessage());
                         try {
                             exitCode = com.janeasystems.nodejs_mobile.NodeRunner.startNodeWithArguments(args);
                         } catch (Throwable t) {
                             Log.e(TAG, "NodeRunner fallback failed: " + t.getMessage(), t);
+                            appendLog("[NodeRunner] Fallback failed: " + t.getMessage());
+                            noteNodeError(t.getMessage());
                         }
                     }
+                    lastExitCode = exitCode;
                     Log.i(TAG, "Node.js engine exited with status: " + exitCode);
+                    appendLog("[NodeRunner] Engine exited with status: " + exitCode);
                 } catch (Exception e) {
                     Log.e(TAG, "Exception in Node.js background thread", e);
+                    appendLog("[NodeRunner] Exception: " + e.getMessage());
+                    noteNodeError(e.getMessage());
                 } finally {
                     nodeRunning = false;
                     if (ipcClient != null) {
@@ -425,6 +493,10 @@ public final class NodeRunner {
             this.port = port;
         }
 
+        boolean isConnected() {
+            return socket != null && socket.isConnected() && !socket.isClosed();
+        }
+
         void start() {
             running.set(true);
             readerThread = new Thread(new Runnable() {
@@ -499,6 +571,7 @@ public final class NodeRunner {
                         this.writer = new BufferedWriter(new OutputStreamWriter(s.getOutputStream(), StandardCharsets.UTF_8));
                     }
                     Log.i(TAG, "Connected to Node.js IPC socket on " + host + ":" + port);
+                    appendLog("[NodeRunner] IPC connected on " + host + ":" + port);
                     retries = 0;
 
                     BufferedReader reader = new BufferedReader(new InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8));
@@ -541,10 +614,13 @@ public final class NodeRunner {
                 if (msg.has("event")) {
                     String event = msg.optString("event");
                     JSONObject data = msg.optJSONObject("data");
+                    noteEvent(event);
+                    appendLog("[Node] event: " + event);
                     dispatchInboundEvent(event, data != null ? data : msg);
                 }
             } catch (Exception e) {
                 Log.w(TAG, "Error parsing incoming IPC JSON: " + e.getMessage());
+                appendLog("[Node] IPC parse error: " + e.getMessage());
             }
         }
 
