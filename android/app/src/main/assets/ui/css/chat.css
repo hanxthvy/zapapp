@@ -394,3 +394,143 @@
   font-size: 0.75rem;
   color: var(--text-secondary);
 }
+
+/* [xihanzu-NR] Zapo Button Composer Modal */
+.zapo-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.zapo-modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.zapo-modal-sheet {
+  background-color: #1f2c34;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 20px 16px;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.5);
+  transform: translateY(100%);
+  transition: transform 0.25s cubic-bezier(0.1, 0.9, 0.2, 1);
+  box-sizing: border-box;
+}
+
+.zapo-modal-overlay.active .zapo-modal-sheet {
+  transform: translateY(0);
+}
+
+.zapo-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #2a3942;
+  padding-bottom: 10px;
+}
+
+.zapo-modal-title {
+  color: #00a884;
+  font-size: 1.05rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.zapo-modal-close {
+  background: none;
+  border: none;
+  color: #8696a0;
+  font-size: 1.3rem;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.zapo-form-group {
+  margin-bottom: 12px;
+}
+
+.zapo-form-label {
+  display: block;
+  font-size: 0.8rem;
+  color: #8696a0;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.zapo-input {
+  width: 100%;
+  background-color: #2a3942;
+  border: 1px solid #3b4a54;
+  border-radius: 8px;
+  color: #e9edef;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.zapo-input:focus {
+  border-color: #00a884;
+}
+
+.zapo-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e9edef;
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.zapo-btn-send {
+  width: 100%;
+  background-color: #00a884;
+  color: #111b21;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 14px;
+}
+
+.zapo-btn-send:active {
+  background-color: #029474;
+}
+
+/* [xihanzu-NR] ViewOnce Badge */
+.chat-viewonce-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.6875rem;
+  color: #00a884;
+  background-color: rgba(0, 168, 132, 0.12);
+  border: 1px solid rgba(0, 168, 132, 0.25);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-top: 4px;
+  margin-right: 6px;
+  user-select: none;
+  font-weight: 500;
+  vertical-align: middle;
+}

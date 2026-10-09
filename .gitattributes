@@ -1,0 +1,2 @@
+# [xihanzu-NR]
+*.apk filter=lfs diff=lfs merge=lfs -text

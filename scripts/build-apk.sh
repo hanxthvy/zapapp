@@ -171,6 +171,8 @@ compile_rust_core() {
     fi
     echo "Using Android NDK: $ANDROID_NDK_HOME"
 
+    export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,-z,common-page-size=16384"
+
     local cargo_profile="release"
     local cargo_flags=("--manifest-path" "$CORE_DIR/Cargo.toml")
     if [ "$BUILD_TYPE" = "release" ]; then
@@ -221,6 +223,12 @@ compile_rust_core() {
             exit 1
         fi
     done
+
+    # Verify and ensure 16KB page-size alignment for Android 15/16/17
+    if [ -f "$SCRIPT_DIR/align-16k.py" ]; then
+        echo "Verifying and aligning JNI libraries for Android 15/16/17 (16KB page-size)..."
+        python3 "$SCRIPT_DIR/align-16k.py" "$JNI_LIBS_DIR"
+    fi
 }
 
 # Step 2: Bundle UI assets into android assets

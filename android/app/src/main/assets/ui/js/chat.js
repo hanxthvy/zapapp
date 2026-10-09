@@ -178,29 +178,30 @@
   // Normalize Button structure (handles both high-level Button and NativeFlowButton protobuf JSON)
   function normalizeButton(rawBtn) {
     if (!rawBtn) return null;
-    let bType = rawBtn.type || rawBtn.name || '';
-    let displayText = rawBtn.display_text || rawBtn.displayText || '';
-    let id = rawBtn.id || '';
-    let url = rawBtn.url || '';
-    let copyCode = rawBtn.copy_code || rawBtn.copyCode || '';
+    let bType = String(rawBtn.type || rawBtn.name || '').toLowerCase();
+    let displayText = rawBtn.display_text || rawBtn.displayText || rawBtn.text || rawBtn.title || rawBtn.label || '';
+    let id = rawBtn.id || rawBtn.buttonId || rawBtn.btn_id || '';
+    let url = rawBtn.url || rawBtn.link || rawBtn.webUrl || '';
+    let copyCode = rawBtn.copy_code || rawBtn.copyCode || rawBtn.code || rawBtn.copy || '';
 
     // If encoded in button_params_json string
-    if (rawBtn.button_params_json) {
+    const paramsJson = rawBtn.button_params_json || rawBtn.buttonParamsJson;
+    if (paramsJson) {
       try {
-        const parsed = JSON.parse(rawBtn.button_params_json);
-        displayText = parsed.display_text || displayText;
-        id = parsed.id || id;
-        url = parsed.url || url;
-        copyCode = parsed.copy_code || copyCode;
+        const parsed = JSON.parse(paramsJson);
+        displayText = parsed.display_text || parsed.displayText || displayText;
+        id = parsed.id || parsed.buttonId || id;
+        url = parsed.url || parsed.link || url;
+        copyCode = parsed.copy_code || parsed.copyCode || copyCode;
       } catch (e) {
         console.warn('[Chat] Failed parsing button_params_json:', e);
       }
     }
 
-    if (bType === 'quick_reply' || (!bType && id)) {
-      return { type: 'quick_reply', display_text: displayText || 'Reply', id: id };
-    } else if (bType === 'cta_url' || (!bType && url)) {
-      return { type: 'cta_url', display_text: displayText || 'Open Link', url: url };
+    if (bType === 'quick_reply' || bType === 'reply' || (!bType && id)) {
+      return { type: 'quick_reply', display_text: displayText || 'Reply', id: id || 'btn_1' };
+    } else if (bType === 'cta_url' || bType === 'url' || (!bType && url)) {
+      return { type: 'cta_url', display_text: displayText || 'Open Link', url: url || 'https://whatsapp.com' };
     } else if (bType === 'cta_copy' || bType === 'copy' || (!bType && copyCode)) {
       return { type: 'cta_copy', display_text: displayText || 'Copy Code', copy_code: copyCode };
     }
@@ -334,6 +335,12 @@
 
     // Interactive buttons if present
     if (msg.buttons && msg.buttons.length) {
+      if (msg.viewOnce) {
+        const voBadge = document.createElement('div');
+        voBadge.className = 'chat-viewonce-badge';
+        voBadge.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg><span>viewOnce</span>`;
+        bubble.appendChild(voBadge);
+      }
       const btnsEl = renderButtons(msg.buttons, msg);
       if (btnsEl) bubble.appendChild(btnsEl);
     }
@@ -350,6 +357,191 @@
         top: chatMessagesEl.scrollHeight,
         behavior: smooth ? 'smooth' : 'auto'
       });
+    });
+  }
+
+  // Zapo Button Composer Modal logic
+  function handleComposerSubmit() {
+    const zapoModal = document.getElementById('zapo-button-modal');
+    if (!zapoModal) return;
+
+    const getEl = (id) => (zapoModal ? zapoModal.querySelector('#' + id) : null) || document.getElementById(id);
+
+    const captionInput = getEl('zapo-modal-caption');
+    const btn1Enable = getEl('zapo-modal-btn1-enable');
+    const btn1TextInput = getEl('zapo-modal-btn1-text');
+    const btn1IdInput = getEl('zapo-modal-btn1-id');
+
+    const btn2Enable = getEl('zapo-modal-btn2-enable');
+    const btn2TextInput = getEl('zapo-modal-btn2-text');
+    const btn2UrlInput = getEl('zapo-modal-btn2-url');
+
+    const btn3Enable = getEl('zapo-modal-btn3-enable');
+    const btn3TextInput = getEl('zapo-modal-btn3-text');
+    const btn3CodeInput = getEl('zapo-modal-btn3-code');
+
+    const viewOnceInput = getEl('zapo-modal-viewonce');
+
+    const caption = (captionInput && captionInput.value && captionInput.value.trim())
+      ? captionInput.value.trim()
+      : 'Silakan pilih salah satu opsi di bawah:';
+
+    const buttons = [];
+
+    // 1. Quick Reply
+    const isBtn1Active = !btn1Enable || btn1Enable.checked;
+    const btn1Text = btn1TextInput && btn1TextInput.value ? btn1TextInput.value.trim() : '';
+    const btn1Id = btn1IdInput && btn1IdInput.value ? btn1IdInput.value.trim() : 'btn_opt_1';
+    if (isBtn1Active && btn1Text) {
+      buttons.push({
+        type: 'quick_reply',
+        display_text: btn1Text,
+        id: btn1Id
+      });
+    }
+
+    // 2. CTA URL
+    const isBtn2Active = !btn2Enable || btn2Enable.checked;
+    const btn2Text = btn2TextInput && btn2TextInput.value ? btn2TextInput.value.trim() : '';
+    const btn2Url = btn2UrlInput && btn2UrlInput.value ? btn2UrlInput.value.trim() : 'https://whatsapp.com';
+    if (isBtn2Active && btn2Text) {
+      buttons.push({
+        type: 'cta_url',
+        display_text: btn2Text,
+        url: btn2Url
+      });
+    }
+
+    // 3. CTA Copy
+    const isBtn3Active = !btn3Enable || btn3Enable.checked;
+    const btn3Text = btn3TextInput && btn3TextInput.value ? btn3TextInput.value.trim() : '';
+    const btn3Code = btn3CodeInput && btn3CodeInput.value ? btn3CodeInput.value.trim() : 'ZAPO-DISCOUNT-50';
+    if (isBtn3Active && btn3Text) {
+      buttons.push({
+        type: 'cta_copy',
+        display_text: btn3Text,
+        copy_code: btn3Code
+      });
+    }
+
+    // Fallback if no buttons active
+    if (buttons.length === 0) {
+      buttons.push({
+        type: 'quick_reply',
+        display_text: 'Konfirmasi',
+        id: 'btn_opt_1'
+      });
+    }
+
+    const isViewOnce = viewOnceInput ? Boolean(viewOnceInput.checked) : true;
+
+    if (window.ZapChat && typeof window.ZapChat.sendButtonMessage === 'function') {
+      window.ZapChat.sendButtonMessage(caption, buttons, { viewOnce: isViewOnce });
+    }
+
+    zapoModal.classList.remove('active');
+  }
+
+  function initButtonComposer() {
+    let zapoModal = document.getElementById('zapo-button-modal');
+    if (!zapoModal) {
+      // Dynamic fallback for standalone or test environments
+      const modalWrapper = document.createElement('div');
+      modalWrapper.innerHTML = `
+        <div class="zapo-modal-overlay" id="zapo-button-modal" role="dialog" aria-modal="true" aria-labelledby="zapo-modal-title">
+          <div class="zapo-modal-sheet">
+            <div class="zapo-modal-header">
+              <div class="zapo-modal-title" id="zapo-modal-title">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                <span>Kirim Pesan Tombol (Zapo ViewOnce)</span>
+              </div>
+              <button type="button" class="zapo-modal-close" id="zapo-modal-close-btn" aria-label="Tutup">&times;</button>
+            </div>
+            <div class="zapo-form-group">
+              <label class="zapo-form-label" for="zapo-modal-caption">Teks Pesan / Keterangan</label>
+              <input type="text" class="zapo-input" id="zapo-modal-caption" placeholder="Teks pesan..." value="Silakan pilih salah satu opsi di bawah:" />
+            </div>
+            <div class="zapo-form-group">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <label class="zapo-form-label" for="zapo-modal-btn1-text" style="margin-bottom:0;">Tombol 1: Quick Reply (Balas Cepat)</label>
+                <label style="font-size:0.75rem;color:#8696a0;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                  <input type="checkbox" id="zapo-modal-btn1-enable" checked /> Aktif
+                </label>
+              </div>
+              <input type="text" class="zapo-input" id="zapo-modal-btn1-text" placeholder="Teks tombol (mis: Konfirmasi)" value="Konfirmasi Pesanan" />
+              <input type="text" class="zapo-input" id="zapo-modal-btn1-id" placeholder="ID tombol (mis: qr_confirm_1)" value="btn_opt_1" style="margin-top:4px;font-size:0.8rem;opacity:0.9;" />
+            </div>
+            <div class="zapo-form-group">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <label class="zapo-form-label" for="zapo-modal-btn2-text" style="margin-bottom:0;">Tombol 2: Buka Tautan URL (CTA URL)</label>
+                <label style="font-size:0.75rem;color:#8696a0;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                  <input type="checkbox" id="zapo-modal-btn2-enable" checked /> Aktif
+                </label>
+              </div>
+              <input type="text" class="zapo-input" id="zapo-modal-btn2-text" placeholder="Teks tombol (mis: Buka Website)" value="Buka Website" />
+              <input type="text" class="zapo-input" id="zapo-modal-btn2-url" placeholder="URL tujuan (mis: https://whatsapp.com)" value="https://whatsapp.com" style="margin-top:4px;" />
+            </div>
+            <div class="zapo-form-group">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <label class="zapo-form-label" for="zapo-modal-btn3-text" style="margin-bottom:0;">Tombol 3: Salin Kode / Voucher (Copy)</label>
+                <label style="font-size:0.75rem;color:#8696a0;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                  <input type="checkbox" id="zapo-modal-btn3-enable" checked /> Aktif
+                </label>
+              </div>
+              <input type="text" class="zapo-input" id="zapo-modal-btn3-text" placeholder="Teks tombol (mis: Salin Kode Promo)" value="Salin Kode Promo" />
+              <input type="text" class="zapo-input" id="zapo-modal-btn3-code" placeholder="Kode yang disalin (mis: ZAPO-DISCOUNT-50)" value="ZAPO-DISCOUNT-50" style="margin-top:4px;" />
+            </div>
+            <label class="zapo-checkbox-label">
+              <input type="checkbox" id="zapo-modal-viewonce" checked />
+              <span>Bungkus dengan <strong>viewOnce</strong> (Bypass batasan Meta)</span>
+            </label>
+            <button type="button" class="zapo-btn-send" id="zapo-modal-submit-btn">Kirim Tombol Sekarang</button>
+          </div>
+        </div>
+      `;
+      const container = document.getElementById('app') || document.body;
+      const child = modalWrapper.firstElementChild || (modalWrapper.children && modalWrapper.children[0]);
+      if (container && child) {
+        if (modalWrapper.children && modalWrapper.children.length > 1 && child.children && child.children.length === 0) {
+          child.children = modalWrapper.children.slice(1);
+        }
+        container.appendChild(child);
+      }
+      zapoModal = document.getElementById('zapo-button-modal');
+    }
+
+    if (!zapoModal || zapoModal._composerBound) return;
+    zapoModal._composerBound = true;
+
+    const closeBtn = (zapoModal ? zapoModal.querySelector('#zapo-modal-close-btn') : null) || document.getElementById('zapo-modal-close-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        zapoModal.classList.remove('active');
+      });
+    }
+
+    // Dismiss on overlay backdrop click
+    zapoModal.addEventListener('click', function (e) {
+      if (e.target === zapoModal) {
+        zapoModal.classList.remove('active');
+      }
+    });
+
+    const submitBtn = (zapoModal ? zapoModal.querySelector('#zapo-modal-submit-btn') : null) || document.getElementById('zapo-modal-submit-btn');
+    if (submitBtn) {
+      submitBtn.addEventListener('click', handleComposerSubmit);
+    }
+  }
+
+  // Dismiss on Escape key
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        const zapoModal = document.getElementById('zapo-button-modal');
+        if (zapoModal && zapoModal.classList.contains('active')) {
+          zapoModal.classList.remove('active');
+        }
+      }
     });
   }
 
@@ -407,6 +599,12 @@
               <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
             </div>
             <span class="attach-label">Gallery</span>
+          </div>
+          <div class="attach-item" data-type="zapo_buttons" id="attach-zapo-buttons">
+            <div class="attach-circle" style="background-color: #00a884; color: #111b21;">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            </div>
+            <span class="attach-label" style="color: #00a884; font-weight: 600;">Zapo Buttons</span>
           </div>
           <div class="attach-item" data-type="contact">
             <div class="attach-circle contact">
@@ -476,11 +674,18 @@
       scrollToBottom(false);
     });
 
+    // Initialize composer modal bindings
+    initButtonComposer();
+
     chatViewEl.querySelectorAll('.attach-item').forEach(function (item) {
       item.addEventListener('click', function () {
         const attachType = item.getAttribute('data-type');
         attachTrayEl.classList.remove('active');
-        dispatchNativeBridge('pickAttachment', { type: attachType });
+        if (attachType === 'zapo_buttons') {
+          window.ZapChat.openButtonComposer();
+        } else {
+          dispatchNativeBridge('pickAttachment', { type: attachType });
+        }
       });
     });
 
@@ -579,6 +784,131 @@
         dispatchNativeBridge('onChatClosed', { chatId: activeChat.id });
       }
       activeChat = null;
+    },
+
+    // Open Zapo Button Composer Modal
+    openButtonComposer: function (chatId) {
+      if (chatId) {
+        window.ZapChat.openChat({ id: chatId, name: 'Zapo Interactive Bot', status: 'online' });
+      } else if (!activeChat) {
+        window.ZapChat.openChat({ id: 'engineering_core', name: 'Zapo Interactive Bot', status: 'online' });
+      }
+      initButtonComposer();
+      const zapoModal = document.getElementById('zapo-button-modal');
+      if (zapoModal) {
+        zapoModal.classList.add('active');
+      }
+    },
+
+    // Close Zapo Button Composer Modal
+    closeButtonComposer: function () {
+      const zapoModal = document.getElementById('zapo-button-modal');
+      if (zapoModal) {
+        zapoModal.classList.remove('active');
+      }
+    },
+
+    // Send interactive button message (Zapo native flow wrapped in viewOnce)
+    sendButtonMessage: function (text, buttons, extra) {
+      if (!activeChat) {
+        window.ZapChat.openChat({ id: 'engineering_core', name: 'Zapo Interactive Bot', status: 'online' });
+      }
+      const msgId = 'msg_btn_' + Date.now();
+      const isViewOnce = extra && extra.viewOnce !== undefined ? !!extra.viewOnce : true;
+      const newMsg = Object.assign({
+        id: msgId,
+        chatId: activeChat.id,
+        fromMe: true,
+        text: text,
+        timestamp: Date.now(),
+        status: 'sent',
+        buttons: buttons || [],
+        viewOnce: isViewOnce
+      }, extra || {});
+
+      if (!messageStore[activeChat.id]) {
+        messageStore[activeChat.id] = [];
+      }
+      messageStore[activeChat.id].push(newMsg);
+
+      if (chatMessagesEl) {
+        const row = createMessageElement(newMsg);
+        chatMessagesEl.appendChild(row);
+        scrollToBottom(true);
+      }
+
+      // Format buttons for Native Flow protobuf schema
+      const normButtons = (buttons || []).map(function (b, idx) {
+        const norm = normalizeButton(b);
+        if (!norm) return null;
+        if (norm.type === 'quick_reply') {
+          return { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: norm.display_text, id: norm.id }) };
+        } else if (norm.type === 'cta_url') {
+          return { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: norm.display_text, url: norm.url }) };
+        } else if (norm.type === 'cta_copy') {
+          return { name: 'cta_copy', buttonParamsJson: JSON.stringify({ display_text: norm.display_text, copy_code: norm.copy_code }) };
+        }
+        return null;
+      }).filter(Boolean);
+
+      const buttonsJson = JSON.stringify(buttons || []);
+      const payload = {
+        id: msgId,
+        to: activeChat.id,
+        chatId: activeChat.id,
+        text: text,
+        buttons: buttons || [],
+        buttonsJson: buttonsJson,
+        viewOnce: isViewOnce
+      };
+
+      if (isViewOnce) {
+        payload.viewOnceMessage = {
+          message: {
+            interactiveMessage: {
+              body: { text: text },
+              nativeFlowMessage: {
+                buttons: normButtons
+              }
+            }
+          }
+        };
+      }
+
+      // Dispatch to Android Native Bridge
+      try {
+        let dispatched = false;
+        const bridgeObj = window.ZapBridge || window.Android;
+        if (bridgeObj && typeof bridgeObj.sendButtonMessage === 'function') {
+          if (bridgeObj.sendButtonMessage.length === 1) {
+            bridgeObj.sendButtonMessage(JSON.stringify(payload));
+            dispatched = true;
+          } else {
+            try {
+              bridgeObj.sendButtonMessage(activeChat.id, text, buttonsJson);
+              dispatched = true;
+            } catch (_) {
+              bridgeObj.sendButtonMessage(JSON.stringify(payload));
+              dispatched = true;
+            }
+          }
+        }
+        if (!dispatched) {
+          dispatchNativeBridge('sendButtonMessage', payload);
+        }
+      } catch (e) {
+        console.warn('[Chat] Native sendButtonMessage failed:', e);
+      }
+
+      // Simulated local tick progression for offline/standalone test
+      setTimeout(function () {
+        window.ZapChat.updateMessageStatus(msgId, 'sent');
+      }, 400);
+      setTimeout(function () {
+        window.ZapChat.updateMessageStatus(msgId, 'delivered');
+      }, 1000);
+
+      return msgId;
     },
 
     // Send a message
@@ -742,9 +1072,14 @@
   }
 
   // Auto-initialize when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wireChatListItems);
-  } else {
+  function initAll() {
     wireChatListItems();
+    initButtonComposer();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAll);
+  } else {
+    initAll();
   }
 })();

@@ -1,8 +1,8 @@
 // [xihanzu-NR]
 package com.hxdev.zapapp;
 
-import android.content.ClipData
-;import android.content.ClipboardManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -11,6 +11,7 @@ import android.os.Looper;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.ExecutorService;
@@ -18,16 +19,24 @@ import java.util.concurrent.Executors;
 
 /**
  * JavaScriptInterface Bridge for Android WebView (window.ZapNative, window.ZapBridge, window.Android).
- * Handles inbound JS-to-Native calls (sendMessage, pair, getStatus, clipboard, URL launching)
- * and dispatches outbound Native events back to the JavaScript runtime via evaluateJavascript.
+ * Handles inbound JS-to-Native calls (sendMessage, sendButtonMessage, pair, clipboard, URL launching)
+ * and dispatches outbound Native / NodeRunner events back to the JavaScript runtime.
  */
-public class WebBridge implements NativeZapCore.EventListener {
+public class WebBridge implements NativeZapCore.EventListener, NodeRunner.EventListener {
     private static final String TAG = "ZapWebBridge";
 
     private final WeakReference<Context> contextRef;
     private final WeakReference<WebView> webViewRef;
     private final Handler mainHandler;
     private final ExecutorService executor;
+
+    // Deduplication caches for high-frequency bridge dispatches
+    private volatile String lastDispatchedQr = null;
+    private volatile long lastQrTimestamp = 0;
+    private volatile String lastDispatchedCode = null;
+    private volatile long lastCodeTimestamp = 0;
+    private volatile String lastDispatchedState = null;
+    private volatile long lastStateTimestamp = 0;
 
     public WebBridge(Context context, WebView webView) {
         this.contextRef = new WeakReference<>(context != null ? context.getApplicationContext() : null);
@@ -36,10 +45,12 @@ public class WebBridge implements NativeZapCore.EventListener {
         this.executor = Executors.newSingleThreadExecutor();
 
         NativeZapCore.addListener(this);
+        NodeRunner.addEventListener(this);
     }
 
     public void detach() {
         NativeZapCore.removeListener(this);
+        NodeRunner.removeEventListener(this);
         executor.shutdown();
     }
 
@@ -99,8 +110,18 @@ public class WebBridge implements NativeZapCore.EventListener {
             executor.execute(new Runnable() {
                 @Override
                 public void run() {
-                    String msgId = NativeZapCore.sendButtonMessage(targetJid, bodyText, btns);
-                    Log.d(TAG, "NativeZapCore.sendButtonMessage result id=" + msgId);
+                    // Route directly to NodeRunner IPC
+                    NodeRunner.sendButtonMessage(targetJid, bodyText, btns, new NodeRunner.IpcCallback() {
+                        @Override
+                        public void onResponse(boolean success, JSONObject response) {
+                            Log.d(TAG, "NodeRunner.sendButtonMessage response success=" + success + ": " + response);
+                            if (!success) {
+                                // Fallback to NativeZapCore if NodeRunner IPC unavailable
+                                String fallbackId = NativeZapCore.sendButtonMessage(targetJid, bodyText, btns);
+                                Log.d(TAG, "NativeZapCore.sendButtonMessage fallback result id=" + fallbackId);
+                            }
+                        }
+                    });
                 }
             });
 
@@ -108,6 +129,60 @@ public class WebBridge implements NativeZapCore.EventListener {
         } catch (Exception e) {
             Log.e(TAG, "sendButtonMessage error", e);
             return "{\"status\":\"error\",\"message\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    @JavascriptInterface
+    public String sendButtonMessage(final String jsonStr) {
+        Log.d(TAG, "sendButtonMessage single argument called from JS: " + jsonStr);
+        try {
+            JSONObject json = new JSONObject(jsonStr);
+            String to = json.optString("to", json.optString("chatId", ""));
+            String text = json.optString("text", json.optString("body", ""));
+            String btns;
+            if (json.has("buttons")) {
+                btns = json.opt("buttons").toString();
+            } else {
+                btns = "[]";
+            }
+            return sendButtonMessage(to, text, btns);
+        } catch (Exception e) {
+            return sendButtonMessage(jsonStr, "", "[]");
+        }
+    }
+
+    @JavascriptInterface
+    public String onRequestPairingCode(final String jsonStr) {
+        Log.d(TAG, "onRequestPairingCode: " + jsonStr);
+        try {
+            JSONObject req = new JSONObject(jsonStr);
+            String phone = req.optString("phoneNumber", req.optString("phone", ""));
+            NodeRunner.requestPairingCode(phone, new NodeRunner.IpcCallback() {
+                @Override
+                public void onResponse(boolean success, JSONObject response) {
+                    if (success && response != null) {
+                        String code = response.optString("code", "");
+                        if (!code.isEmpty()) {
+                            dispatchPairingCodeReceived(code);
+                        }
+                    }
+                }
+            });
+            return "{\"status\":\"pending\"}";
+        } catch (Exception e) {
+            Log.e(TAG, "onRequestPairingCode error", e);
+            return "{\"status\":\"error\",\"message\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    @JavascriptInterface
+    public String onRequestQr(final String jsonStr) {
+        Log.d(TAG, "onRequestQr: " + jsonStr);
+        try {
+            NodeRunner.sendCommand("request_qr", new JSONObject(), null);
+            return "{\"status\":\"pending\"}";
+        } catch (Exception e) {
+            return "{\"status\":\"error\"}";
         }
     }
 
@@ -133,6 +208,7 @@ public class WebBridge implements NativeZapCore.EventListener {
         executor.execute(new Runnable() {
             @Override
             public void run() {
+                NodeRunner.disconnectWa(null);
                 boolean success = NativeZapCore.disconnect();
                 Log.i(TAG, "NativeZapCore.disconnect result: " + success);
             }
@@ -170,8 +246,121 @@ public class WebBridge implements NativeZapCore.EventListener {
     }
 
     // -------------------------------------------------------------------------
+    // NodeRunner EventListener Implementation
+    // -------------------------------------------------------------------------
+
+    @Override
+    public void onEvent(final String event, final JSONObject data) {
+        if (event == null || data == null) return;
+        try {
+            if ("qr_live".equals(event) || "auth_qr".equals(event)) {
+                String qr = data.optString("svg", "");
+                if (qr.isEmpty()) {
+                    qr = data.optString("qr", data.optString("payload", ""));
+                }
+                if (!qr.isEmpty()) {
+                    dispatchQrReceived(qr);
+                }
+            } else if ("pairing_code_live".equals(event) || "auth_pairing_code".equals(event)) {
+                String code = data.optString("formattedCode", "");
+                if (code.isEmpty()) {
+                    code = data.optString("code", "");
+                }
+                if (!code.isEmpty()) {
+                    dispatchPairingCodeReceived(code);
+                }
+            } else if ("auth_paired".equals(event)) {
+                dispatchPairingStateUpdate("paired");
+            } else if ("connection".equals(event)) {
+                String status = data.optString("status", "");
+                if ("open".equalsIgnoreCase(status) || "connected".equalsIgnoreCase(status) || "paired".equalsIgnoreCase(status)) {
+                    dispatchPairingStateUpdate("paired");
+                }
+            } else if ("message".equals(event)) {
+                String chatId = data.optString("chatId", "");
+                String id = data.optString("id", "");
+                String text = data.optString("text", data.optString("content", ""));
+                String type = data.optString("type", "text");
+                long ts = data.optLong("timestamp", System.currentTimeMillis());
+                dispatchIncomingMessage(chatId, id, text, type, ts);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error handling NodeRunner event: " + event, e);
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Outbound Native-to-JS Event Dispatchers
     // -------------------------------------------------------------------------
+
+    public void dispatchQrReceived(final String qrSvgOrString) {
+        if (qrSvgOrString == null || qrSvgOrString.isEmpty()) return;
+        long now = System.currentTimeMillis();
+        if (qrSvgOrString.equals(lastDispatchedQr) && (now - lastQrTimestamp < 500)) {
+            return;
+        }
+        lastDispatchedQr = qrSvgOrString;
+        lastQrTimestamp = now;
+
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                WebView wv = webViewRef.get();
+                if (wv == null) return;
+                String script = String.format(
+                    "(function(){ if(typeof window.onQrReceived === 'function') window.onQrReceived(%s); })();",
+                    JSONObject.quote(qrSvgOrString)
+                );
+                wv.evaluateJavascript(script, null);
+            }
+        });
+    }
+
+    public void dispatchPairingCodeReceived(final String code) {
+        if (code == null || code.isEmpty()) return;
+        long now = System.currentTimeMillis();
+        if (code.equals(lastDispatchedCode) && (now - lastCodeTimestamp < 500)) {
+            return;
+        }
+        lastDispatchedCode = code;
+        lastCodeTimestamp = now;
+
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                WebView wv = webViewRef.get();
+                if (wv == null) return;
+                String script = String.format(
+                    "(function(){ if(typeof window.onPairingCodeReceived === 'function') window.onPairingCodeReceived(%s); })();",
+                    JSONObject.quote(code)
+                );
+                wv.evaluateJavascript(script, null);
+            }
+        });
+    }
+
+    public void dispatchPairingStateUpdate(final String state) {
+        final String effectiveState = (state != null && !state.isEmpty()) ? state : "paired";
+        long now = System.currentTimeMillis();
+        if (effectiveState.equals(lastDispatchedState) && (now - lastStateTimestamp < 500)) {
+            return;
+        }
+        lastDispatchedState = effectiveState;
+        lastStateTimestamp = now;
+
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                WebView wv = webViewRef.get();
+                if (wv == null) return;
+                String script = String.format(
+                    "(function(){ if(typeof window.onPairingStateUpdate === 'function') window.onPairingStateUpdate(%s); })();",
+                    JSONObject.quote(effectiveState)
+                );
+                wv.evaluateJavascript(script, null);
+            }
+        });
+    }
 
     public void dispatchMessageStatus(final String messageId, final String status) {
         mainHandler.post(new Runnable() {
@@ -180,8 +369,9 @@ public class WebBridge implements NativeZapCore.EventListener {
                 WebView wv = webViewRef.get();
                 if (wv == null) return;
                 String script = String.format(
-                    "(function(){ if(window.onMessageStatusUpdate) window.onMessageStatusUpdate('%s','%s'); })();",
-                    escapeJs(messageId), escapeJs(status)
+                    "(function(){ if(typeof window.onMessageStatusUpdate === 'function') window.onMessageStatusUpdate(%s,%s); })();",
+                    JSONObject.quote(messageId != null ? messageId : ""),
+                    JSONObject.quote(status != null ? status : "")
                 );
                 wv.evaluateJavascript(script, null);
             }
@@ -194,14 +384,30 @@ public class WebBridge implements NativeZapCore.EventListener {
             public void run() {
                 WebView wv = webViewRef.get();
                 if (wv == null) return;
-                String script = String.format(
-                    "(function(){ if(window.onReceiveMessage) window.onReceiveMessage({chatId:'%s',id:'%s',text:'%s',type:'%s',fromMe:false,timestamp:%d}); })();",
-                    escapeJs(chatId), escapeJs(id), escapeJs(text), escapeJs(type), timestamp
-                );
-                wv.evaluateJavascript(script, null);
+                try {
+                    JSONObject msg = new JSONObject();
+                    msg.put("chatId", chatId != null ? chatId : "");
+                    msg.put("id", id != null ? id : "");
+                    msg.put("text", text != null ? text : "");
+                    msg.put("type", type != null ? type : "text");
+                    msg.put("fromMe", false);
+                    msg.put("timestamp", timestamp);
+
+                    String script = String.format(
+                        "(function(){ if(typeof window.onReceiveMessage === 'function') window.onReceiveMessage(%s); })();",
+                        msg.toString()
+                    );
+                    wv.evaluateJavascript(script, null);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error dispatching incoming message", e);
+                }
             }
         });
     }
+
+    // -------------------------------------------------------------------------
+    // NativeZapCore.EventListener Implementation
+    // -------------------------------------------------------------------------
 
     @Override
     public void onMessageReceived(String chatId, String messageId, String text, String type, long timestamp) {
@@ -215,38 +421,17 @@ public class WebBridge implements NativeZapCore.EventListener {
 
     @Override
     public void onQrReceived(final String qrString) {
-        mainHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                WebView wv = webViewRef.get();
-                if (wv == null) return;
-                String script = String.format(
-                    "(function(){ if(window.onQrReceived) window.onQrReceived('%s'); })();",
-                    escapeJs(qrString)
-                );
-                wv.evaluateJavascript(script, null);
-            }
-        });
+        dispatchQrReceived(qrString);
     }
 
     @Override
     public void onPairingStateChanged(final String state, final String details) {
-        mainHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                WebView wv = webViewRef.get();
-                if (wv == null) return;
-                String script = String.format(
-                    "(function(){ if(window.onPairingStateUpdate) window.onPairingStateUpdate('%s','%s'); })();",
-                    escapeJs(state), escapeJs(details)
-                );
-                wv.evaluateJavascript(script, null);
-            }
-        });
-    }
-
-    private static String escapeJs(String str) {
-        if (str == null) return "";
-        return str.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "");
+        if ("paired".equalsIgnoreCase(state) || "open".equalsIgnoreCase(state) || "connected".equalsIgnoreCase(state)) {
+            dispatchPairingStateUpdate("paired");
+        } else if ("pairing_code".equalsIgnoreCase(state) && details != null && !details.isEmpty()) {
+            dispatchPairingCodeReceived(details);
+        } else {
+            dispatchPairingStateUpdate(state);
+        }
     }
 }

@@ -81,6 +81,21 @@
     <main class="app-content">
       <!-- Chats Panel -->
       <section class="tab-panel active" id="tab-chats" role="tabpanel">
+        <!-- [xihanzu-NR] Auth Prompt Banner -->
+        <div class="auth-prompt-banner" id="auth-prompt-banner">
+          <div class="auth-banner-icon">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+              <path d="M4 6h16v10H4z" fill="none"/>
+              <path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/>
+            </svg>
+          </div>
+          <div class="auth-banner-content">
+            <div class="auth-banner-title">WhatsApp Belum Tertaut</div>
+            <div class="auth-banner-desc">Pindai kode QR atau gunakan kode 8-digit untuk menghubungkan akun Anda.</div>
+          </div>
+          <button class="auth-banner-btn" id="auth-banner-link-btn">Tautkan</button>
+        </div>
+
         <div class="list-group">
           <article class="list-item">
             <div class="avatar">
@@ -226,6 +241,38 @@
           </div>
         </div>
 
+        <div class="settings-section-title">Zapo Core Protocol Engine</div>
+
+        <div class="settings-row" style="background-color: #1f2c34; border-radius: 8px; margin: 4px 12px; padding: 12px;">
+          <div class="settings-icon" style="color: #00a884;">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+          </div>
+          <div class="item-content">
+            <div class="settings-title" style="color: #00a884;">Zapo Native Engine v1.0.0</div>
+            <div class="settings-desc" style="color: #8696a0; font-size: 11px;">
+              • Gateway: wss://web.whatsapp.com/ws/chat<br>
+              • Handshake: Noise_XX_25519_AESGCM_SHA256<br>
+              • Encryption: Signal Curve25519 + Ed25519 E2EE<br>
+              • Storage: SQLite WAL Persistent Cache<br>
+              • Background: Android Sticky Foreground Service (Anti-Doze)
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-row" id="settings-test-buttons-btn" style="cursor: pointer;">
+          <div class="settings-icon" style="color: #00a884;">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+            </svg>
+          </div>
+          <div class="item-content">
+            <div class="settings-title">Tes Tombol Interaktif (ViewOnce)</div>
+            <div class="settings-desc">Buka obrolan dan luncurkan composer tombol Native Flow</div>
+          </div>
+        </div>
+
         <div class="settings-section-title">Preferences</div>
 
         <div class="settings-row" id="settings-linked-devices-btn" style="cursor: pointer;">
@@ -276,6 +323,18 @@
             <div class="settings-desc">Message, group & call tones</div>
           </div>
         </div>
+
+        <div class="settings-row" id="settings-logout-btn" style="cursor: pointer; border-top: 1px solid var(--border-color); margin-top: 16px;">
+          <div class="settings-icon" style="color: #ea4335;">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
+            </svg>
+          </div>
+          <div class="item-content">
+            <div class="settings-title" style="color: #ea4335;">Tautkan Ulang / Putuskan Sesi</div>
+            <div class="settings-desc">Keluar dan buka kembali layar QR / Pairing Code</div>
+          </div>
+        </div>
       </section>
     </main>
 
@@ -286,6 +345,64 @@
         <path fill="currentColor" d="M7 9h10v2H7zm0-3h10v2H7z"/>
       </svg>
     </button>
+
+    <!-- [xihanzu-NR] Zapo Button Composer Modal -->
+    <div class="zapo-modal-overlay" id="zapo-button-modal" role="dialog" aria-modal="true" aria-labelledby="zapo-modal-title">
+      <div class="zapo-modal-sheet">
+        <div class="zapo-modal-header">
+          <div class="zapo-modal-title" id="zapo-modal-title">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            <span>Kirim Pesan Tombol (Zapo ViewOnce)</span>
+          </div>
+          <button type="button" class="zapo-modal-close" id="zapo-modal-close-btn" aria-label="Tutup">&times;</button>
+        </div>
+
+        <div class="zapo-form-group">
+          <label class="zapo-form-label" for="zapo-modal-caption">Teks Pesan / Keterangan</label>
+          <input type="text" class="zapo-input" id="zapo-modal-caption" placeholder="Teks pesan..." value="Silakan pilih salah satu opsi di bawah:" />
+        </div>
+
+        <div class="zapo-form-group">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <label class="zapo-form-label" for="zapo-modal-btn1-text" style="margin-bottom:0;">Tombol 1: Quick Reply (Balas Cepat)</label>
+            <label style="font-size:0.75rem;color:#8696a0;display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="checkbox" id="zapo-modal-btn1-enable" checked /> Aktif
+            </label>
+          </div>
+          <input type="text" class="zapo-input" id="zapo-modal-btn1-text" placeholder="Teks tombol (mis: Konfirmasi)" value="Konfirmasi Pesanan" />
+          <input type="text" class="zapo-input" id="zapo-modal-btn1-id" placeholder="ID tombol (mis: qr_confirm_1)" value="btn_opt_1" style="margin-top:4px;font-size:0.8rem;opacity:0.9;" />
+        </div>
+
+        <div class="zapo-form-group">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <label class="zapo-form-label" for="zapo-modal-btn2-text" style="margin-bottom:0;">Tombol 2: Buka Tautan URL (CTA URL)</label>
+            <label style="font-size:0.75rem;color:#8696a0;display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="checkbox" id="zapo-modal-btn2-enable" checked /> Aktif
+            </label>
+          </div>
+          <input type="text" class="zapo-input" id="zapo-modal-btn2-text" placeholder="Teks tombol (mis: Buka Website)" value="Buka Website" />
+          <input type="text" class="zapo-input" id="zapo-modal-btn2-url" placeholder="URL tujuan (mis: https://whatsapp.com)" value="https://whatsapp.com" style="margin-top:4px;" />
+        </div>
+
+        <div class="zapo-form-group">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <label class="zapo-form-label" for="zapo-modal-btn3-text" style="margin-bottom:0;">Tombol 3: Salin Kode / Voucher (Copy)</label>
+            <label style="font-size:0.75rem;color:#8696a0;display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="checkbox" id="zapo-modal-btn3-enable" checked /> Aktif
+            </label>
+          </div>
+          <input type="text" class="zapo-input" id="zapo-modal-btn3-text" placeholder="Teks tombol (mis: Salin Kode Promo)" value="Salin Kode Promo" />
+          <input type="text" class="zapo-input" id="zapo-modal-btn3-code" placeholder="Kode yang disalin (mis: ZAPO-DISCOUNT-50)" value="ZAPO-DISCOUNT-50" style="margin-top:4px;" />
+        </div>
+
+        <label class="zapo-checkbox-label">
+          <input type="checkbox" id="zapo-modal-viewonce" checked />
+          <span>Bungkus dengan <strong>viewOnce</strong> (Bypass batasan Meta)</span>
+        </label>
+
+        <button type="button" class="zapo-btn-send" id="zapo-modal-submit-btn">Kirim Tombol Sekarang</button>
+      </div>
+    </div>
   </div>
 
   <script src="js/app.js"></script>

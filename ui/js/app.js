@@ -20,6 +20,18 @@
     settings: `<svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>`
   };
 
+  // Strict Mandatory Gate check
+  function ensurePaired() {
+    const isPaired = localStorage.getItem('zap_is_paired');
+    if (isPaired !== 'true') {
+      if (window.ZapAuth && typeof window.ZapAuth.open === 'function') {
+        window.ZapAuth.open('qr');
+      }
+      return false;
+    }
+    return true;
+  }
+
   function switchTab(targetTab) {
     if (!targetTab) return;
     activeTab = targetTab;
@@ -84,10 +96,11 @@
     });
   }
 
-  // Open chat room when tapping any chat row
+  // Open chat room when tapping any chat row (strictly gated if not paired)
   function bindChatRowClicks() {
     document.querySelectorAll('#tab-chats .list-item').forEach(function (item) {
       item.addEventListener('click', function () {
+        if (!ensurePaired()) return;
         const title = item.querySelector('.item-title')?.textContent || 'Chat';
         const id = title.toLowerCase().replace(/\s+/g, '_');
         if (window.ZapChat && typeof window.ZapChat.openChat === 'function') {
@@ -101,6 +114,7 @@
   // Floating Action Button to initiate new chat or custom number
   if (fab) {
     fab.addEventListener('click', function () {
+      if (!ensurePaired()) return;
       if (activeTab === 'chats') {
         const targetNum = prompt('Masukkan nomor WhatsApp (contoh: 628123456789):');
         if (targetNum) {
@@ -122,6 +136,9 @@
     const banner = document.getElementById('auth-prompt-banner');
     if (banner) {
       banner.style.display = isPaired === 'true' ? 'none' : 'flex';
+    }
+    if (isPaired === 'true') {
+      switchTab('chats');
     }
   }
   window.updatePairingBanner = updatePairingBanner;
@@ -173,13 +190,14 @@
         }
       } catch (e) {}
       if (window.ZapAuth && typeof window.ZapAuth.open === 'function') {
+        if (typeof window.ZapAuth.reset === 'function') window.ZapAuth.reset();
         window.ZapAuth.open('qr');
       }
     });
   }
 
   // MANDATORY LOGIN CHECK:
-  // If not authenticated, open Auth Screen (QR mode) automatically!
+  // Strict gate: if not paired, mandatory Auth Screen (QR mode) opens automatically
   function checkInitialAuth() {
     updatePairingBanner();
     const isPaired = localStorage.getItem('zap_is_paired');
@@ -187,20 +205,22 @@
       if (window.ZapAuth && typeof window.ZapAuth.open === 'function') {
         window.ZapAuth.open('qr');
       }
+    } else {
+      switchTab('chats');
     }
   }
 
   window.ZapAppInit = checkInitialAuth;
 
-  // Initialize
+  // Initialize default tab
   switchTab('chats');
 
   // Trigger Auth immediately on load
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
-      setTimeout(checkInitialAuth, 100);
+      setTimeout(checkInitialAuth, 50);
     });
   } else {
-    setTimeout(checkInitialAuth, 100);
+    setTimeout(checkInitialAuth, 50);
   }
 })();

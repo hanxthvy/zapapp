@@ -18,16 +18,18 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
+import org.json.JSONObject;
+
 import java.io.File;
 
 /**
  * Main Activity hosting the ZapApp lightweight Single Page Application inside Android WebView.
  * Handles:
- * - Full-screen edge-to-edge layout and status bar styling
+ * - Edge-to-edge layout and status bar chrome styling
  * - Optimized WebView container configuration (DOM storage, JS bridge, hardware acceleration)
  * - Loading local bundled assets from ui/index.html
- * - Injecting JavaScriptInterface (window.ZapNative, window.ZapBridge, window.Android)
- * - Foreground service lifecycle coordination
+ * - Inbound and outbound JavaScriptInterface bridges (window.ZapNative, window.ZapBridge, window.Android)
+ * - Coordinating NodeRunner embedded runtime and dispatching live QR, pairing code, and status events directly into WebView
  */
 public class MainActivity extends Activity {
     private static final String TAG = "ZapMainActivity";
@@ -41,6 +43,7 @@ public class MainActivity extends Activity {
 
     private WebView webView;
     private WebBridge webBridge;
+    private NodeRunner.EventListener nodeEventListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +58,9 @@ public class MainActivity extends Activity {
 
         // Ensure background persistent service is active
         ZapForegroundService.start(this);
+
+        // Start embedded NodeRunner runtime for background WhatsApp engine & IPC
+        NodeRunner.start(this);
 
         // Setup WebView host
         FrameLayout rootLayout = new FrameLayout(this);
@@ -76,6 +82,7 @@ public class MainActivity extends Activity {
 
         setupWebViewSettings();
         setupJavaScriptBridge();
+        setupNodeRunnerWiring();
         loadLocalUiAssets();
     }
 
@@ -178,6 +185,112 @@ public class MainActivity extends Activity {
         Log.i(TAG, "Injected JavaScript interfaces: " + BRIDGE_NAME_NATIVE + ", " + BRIDGE_NAME_BRIDGE + ", " + BRIDGE_NAME_ANDROID);
     }
 
+    private void setupNodeRunnerWiring() {
+        nodeEventListener = new NodeRunner.EventListener() {
+            @Override
+            public void onEvent(String event, JSONObject data) {
+                if (data == null) return;
+                try {
+                    if ("qr_live".equals(event) || "auth_qr".equals(event)) {
+                        String qr = data.optString("svg", "");
+                        if (qr.isEmpty()) {
+                            qr = data.optString("qr", data.optString("payload", ""));
+                        }
+                        if (!qr.isEmpty()) {
+                            dispatchQrToWebView(qr);
+                        }
+                    } else if ("pairing_code_live".equals(event) || "auth_pairing_code".equals(event)) {
+                        String code = data.optString("formattedCode", "");
+                        if (code.isEmpty()) {
+                            code = data.optString("code", "");
+                        }
+                        if (!code.isEmpty()) {
+                            dispatchPairingCodeToWebView(code);
+                        }
+                    } else if ("auth_paired".equals(event)) {
+                        dispatchPairingStateToWebView("paired");
+                    } else if ("connection".equals(event)) {
+                        String status = data.optString("status", "");
+                        if ("open".equalsIgnoreCase(status) || "connected".equalsIgnoreCase(status) || "paired".equalsIgnoreCase(status)) {
+                            dispatchPairingStateToWebView("paired");
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in MainActivity NodeRunner event handler: " + event, e);
+                }
+            }
+        };
+        NodeRunner.addEventListener(nodeEventListener);
+    }
+
+    public void dispatchQrToWebView(final String qrSvgOrString) {
+        if (webBridge != null) {
+            webBridge.dispatchQrReceived(qrSvgOrString);
+        } else if (webView != null && qrSvgOrString != null && !qrSvgOrString.isEmpty()) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    String script = String.format(
+                        "(function(){ if(typeof window.onQrReceived === 'function') window.onQrReceived(%s); })();",
+                        JSONObject.quote(qrSvgOrString)
+                    );
+                    webView.evaluateJavascript(script, null);
+                }
+            });
+        }
+    }
+
+    public void dispatchPairingCodeToWebView(final String code) {
+        if (webBridge != null) {
+            webBridge.dispatchPairingCodeReceived(code);
+        } else if (webView != null && code != null && !code.isEmpty()) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    String script = String.format(
+                        "(function(){ if(typeof window.onPairingCodeReceived === 'function') window.onPairingCodeReceived(%s); })();",
+                        JSONObject.quote(code)
+                    );
+                    webView.evaluateJavascript(script, null);
+                }
+            });
+        }
+    }
+
+    public void dispatchPairingStateToWebView(final String state) {
+        final String effectiveState = (state != null && !state.isEmpty()) ? state : "paired";
+        if (webBridge != null) {
+            webBridge.dispatchPairingStateUpdate(effectiveState);
+        } else if (webView != null) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    String script = String.format(
+                        "(function(){ if(typeof window.onPairingStateUpdate === 'function') window.onPairingStateUpdate(%s); })();",
+                        JSONObject.quote(effectiveState)
+                    );
+                    webView.evaluateJavascript(script, null);
+                }
+            });
+        }
+    }
+
+    public void sendButtonMessage(String to, String text, String buttonsJson) {
+        if (webBridge != null) {
+            webBridge.sendButtonMessage(to, text, buttonsJson);
+        } else {
+            NodeRunner.sendButtonMessage(to, text, buttonsJson, null);
+        }
+    }
+
+    public WebView getWebView() {
+        return webView;
+    }
+
+    public WebBridge getWebBridge() {
+        return webBridge;
+    }
+
     private void loadLocalUiAssets() {
         Log.i(TAG, "Loading local UI asset from: " + ASSET_URL);
         webView.loadUrl(ASSET_URL);
@@ -227,8 +340,13 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (nodeEventListener != null) {
+            NodeRunner.removeEventListener(nodeEventListener);
+            nodeEventListener = null;
+        }
         if (webBridge != null) {
             webBridge.detach();
+            webBridge = null;
         }
         if (webView != null) {
             webView.stopLoading();
@@ -238,6 +356,7 @@ public class MainActivity extends Activity {
             webView.removeJavascriptInterface(BRIDGE_NAME_BRIDGE);
             webView.removeJavascriptInterface(BRIDGE_NAME_ANDROID);
             webView.destroy();
+            webView = null;
         }
         super.onDestroy();
         Log.i(TAG, "MainActivity onDestroy completed.");

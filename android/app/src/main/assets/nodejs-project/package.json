@@ -1,0 +1,20 @@
+{
+  "name": "zapo-mobile-node",
+  "version": "1.0.0",
+  "description": "Zapo WhatsApp Android Node.js Mobile runtime with SQLite WAL persistence",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js",
+    "test": "node store/test.js && node qr-flow.js && node pairing-flow.js && node button-flow.js && node test_main.js && node test_ipc.js"
+  },
+  "keywords": [
+    "zapo",
+    "whatsapp",
+    "sqlite",
+    "wal",
+    "persistence",
+    "android"
+  ],
+  "author": "HxDev",
+  "license": "ISC"
+}

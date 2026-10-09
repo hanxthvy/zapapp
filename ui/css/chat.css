@@ -397,7 +397,7 @@
 
 /* [xihanzu-NR] Zapo Button Composer Modal */
 .zapo-modal-overlay {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
@@ -406,7 +406,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  z-index: 200;
+  z-index: 1000;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;
@@ -515,4 +515,22 @@
 
 .zapo-btn-send:active {
   background-color: #029474;
+}
+
+/* [xihanzu-NR] ViewOnce Badge */
+.chat-viewonce-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.6875rem;
+  color: #00a884;
+  background-color: rgba(0, 168, 132, 0.12);
+  border: 1px solid rgba(0, 168, 132, 0.25);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-top: 4px;
+  margin-right: 6px;
+  user-select: none;
+  font-weight: 500;
+  vertical-align: middle;
 }

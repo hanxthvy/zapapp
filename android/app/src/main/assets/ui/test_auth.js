@@ -301,6 +301,16 @@ assert(typeof window.onSyncProgressUpdate === 'function', 'window.onSyncProgress
 window.onPairingCodeReceived(JSON.stringify({ code: '77889900', ttl: 120 }));
 assert.strictEqual(window.ZapAuth.getState().pairingCode, '77889900', 'Hook must update pairing code');
 
+// Direct string invocations from Android WebView
+window.onPairingCodeReceived('88990011');
+assert.strictEqual(window.ZapAuth.getState().pairingCode, '88990011', 'Raw string code must update pairing code');
+
+window.onQrReceived('2@live_qr_matrix_raw,key1,key2');
+assert.strictEqual(window.ZapAuth.getState().qrPayload, '2@live_qr_matrix_raw,key1,key2', 'Raw string QR must update qrPayload');
+
+window.onPairingStateUpdate('paired');
+assert.strictEqual(window.ZapAuth.getState().uiState, 'paired', 'Direct paired state update must transition UI state to paired');
+
 window.onSyncProgressUpdate(JSON.stringify({ progress: 85, subtext: 'Finalizing database...' }));
 assert.strictEqual(window.ZapAuth.getState().syncProgress, 85, 'Hook must update sync progress');
 console.log('  [PASS] 9. Android WebView inbound hooks verified');

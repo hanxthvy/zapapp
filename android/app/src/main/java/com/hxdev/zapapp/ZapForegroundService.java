@@ -11,17 +11,22 @@ import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.net.ConnectivityManager;
 import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.util.Log;
 
+import com.janeasystems.nodejs_mobile.NodeRunner;
+
 /**
  * Sticky Foreground Service for ZapApp.
  * Ensures background connection resiliency with:
  * - START_STICKY process lifecycle management
- * - Ongoing foreground notification
- * - Partial WakeLock to prevent CPU sleep during background sync
+ * - Embedded NodeRunner runtime initialization and continuous execution
+ * - Active Partial WakeLock to prevent CPU sleep during background sync
+ * - Continuous network connectivity monitoring and reconnection handling
  */
 public class ZapForegroundService extends Service {
     private static final String TAG = "ZapForegroundService";
@@ -38,13 +43,13 @@ public class ZapForegroundService extends Service {
 
     private static final int REQUEST_CODE_MAIN = 100;
     private static final int REQUEST_CODE_STOP = 101;
-    private static final long TRANSIENT_WAKELOCK_TIMEOUT_MS = 15000L;
     private static final int COLOR_WHATSAPP_TEAL = 0xFF00A884;
 
     private static final String NOTIFICATION_TITLE = "ZapApp Active";
     private static final String NOTIFICATION_TEXT = "Maintaining background connection...";
 
     public static volatile boolean isRunning = false;
+    public static volatile boolean isNetworkConnected = false;
 
     private PowerManager.WakeLock wakeLock;
     private ConnectivityManager connectivityManager;
@@ -56,7 +61,9 @@ public class ZapForegroundService extends Service {
         Log.i(TAG, "ZapForegroundService onCreate initialized.");
         createNotificationChannel();
         initWakeLock();
+        acquireWakeLock();
         registerNetworkCallback();
+        startNodeRunner();
     }
 
     @Override
@@ -68,13 +75,16 @@ public class ZapForegroundService extends Service {
             Log.i(TAG, "Stopping foreground service requested via action.");
             stopServiceGracefully();
             return START_NOT_STICKY;
-        } else if (ACTION_RECONNECT.equals(action)) {
-            Log.d(TAG, "Reconnecting background worker...");
-            acquireWakeLock(TRANSIENT_WAKELOCK_TIMEOUT_MS);
-        } else {
-            startForegroundNotification();
-            acquireWakeLock(0);
-            isRunning = true;
+        }
+
+        startForegroundNotification();
+        acquireWakeLock();
+        isRunning = true;
+
+        startNodeRunner();
+
+        if (ACTION_RECONNECT.equals(action)) {
+            Log.d(TAG, "Reconnection requested. Ensuring WakeLock active and NodeRunner running.");
         }
 
         return START_STICKY;
@@ -92,6 +102,34 @@ public class ZapForegroundService extends Service {
         releaseWakeLock();
         unregisterNetworkCallback();
         super.onDestroy();
+    }
+
+    /**
+     * Starts the embedded Node.js runtime via NodeRunner on a background thread.
+     * Prevents blocking the service Looper during asset extraction and initialization.
+     */
+    private synchronized void startNodeRunner() {
+        try {
+            if (NodeRunner.isRunning()) {
+                Log.d(TAG, "NodeRunner runtime is already running.");
+                return;
+            }
+            Log.i(TAG, "Starting NodeRunner embedded runtime...");
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Context appContext = getApplicationContext();
+                        NodeRunner.startNode(appContext);
+                        Log.i(TAG, "NodeRunner started successfully.");
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to start NodeRunner in worker thread", e);
+                    }
+                }
+            }, "ZapNodeRunnerStarter").start();
+        } catch (Exception e) {
+            Log.e(TAG, "Error initiating NodeRunner startup", e);
+        }
     }
 
     private void createNotificationChannel() {
@@ -114,13 +152,7 @@ public class ZapForegroundService extends Service {
 
     private void startForegroundNotification() {
         Notification notification = buildOngoingNotification();
-        if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-            );
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 NOTIFICATION_ID,
                 notification,
@@ -132,6 +164,7 @@ public class ZapForegroundService extends Service {
         Log.d(TAG, "Service promoted to foreground with notification id: " + NOTIFICATION_ID);
     }
 
+    @SuppressWarnings("deprecation")
     private Notification buildOngoingNotification() {
         int pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -188,17 +221,28 @@ public class ZapForegroundService extends Service {
         return builder.build();
     }
 
-    private void initWakeLock() {
+    private synchronized void initWakeLock() {
         if (wakeLock == null) {
             PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
             if (powerManager != null) {
                 wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG);
                 wakeLock.setReferenceCounted(false);
+                Log.d(TAG, "Partial WakeLock initialized.");
             }
         }
     }
 
-    private void acquireWakeLock(long timeoutMs) {
+    /**
+     * Acquires and keeps Partial WakeLock active indefinitely.
+     */
+    private synchronized void acquireWakeLock() {
+        acquireWakeLock(0);
+    }
+
+    /**
+     * Acquires Partial WakeLock. If timeoutMs is 0 or negative, acquires indefinite lock.
+     */
+    private synchronized void acquireWakeLock(long timeoutMs) {
         try {
             initWakeLock();
             if (wakeLock != null && !wakeLock.isHeld()) {
@@ -207,7 +251,7 @@ public class ZapForegroundService extends Service {
                     Log.d(TAG, "Acquired Partial WakeLock with timeout: " + timeoutMs + " ms");
                 } else {
                     wakeLock.acquire();
-                    Log.d(TAG, "Acquired Partial WakeLock (indefinite)");
+                    Log.d(TAG, "Acquired Partial WakeLock (active indefinitely)");
                 }
             }
         } catch (Exception e) {
@@ -215,7 +259,7 @@ public class ZapForegroundService extends Service {
         }
     }
 
-    private void releaseWakeLock() {
+    private synchronized void releaseWakeLock() {
         try {
             if (wakeLock != null && wakeLock.isHeld()) {
                 wakeLock.release();
@@ -226,27 +270,60 @@ public class ZapForegroundService extends Service {
         }
     }
 
+    /**
+     * Registers network callback to monitor connectivity changes.
+     * When network connectivity is restored, ensures Partial WakeLock is active and NodeRunner is running.
+     */
     private void registerNetworkCallback() {
         try {
             connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && connectivityManager != null) {
-                networkCallback = new ConnectivityManager.NetworkCallback() {
-                    @Override
-                    public void onAvailable(Network network) {
-                        Log.i(TAG, "Network available. Refreshing connection heartbeat.");
-                        acquireWakeLock(TRANSIENT_WAKELOCK_TIMEOUT_MS);
-                    }
+            if (connectivityManager == null) {
+                Log.w(TAG, "ConnectivityManager not available.");
+                return;
+            }
 
-                    @Override
-                    public void onLost(Network network) {
-                        Log.w(TAG, "Network lost. Waiting for connection recovery.");
+            networkCallback = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(Network network) {
+                    super.onAvailable(network);
+                    isNetworkConnected = true;
+                    Log.i(TAG, "Network available. Keeping Partial WakeLock active and ensuring NodeRunner.");
+                    acquireWakeLock();
+                    if (!NodeRunner.isRunning()) {
+                        startNodeRunner();
                     }
-                };
+                }
+
+                @Override
+                public void onLost(Network network) {
+                    super.onLost(network);
+                    isNetworkConnected = false;
+                    Log.w(TAG, "Network lost. Waiting for connection recovery.");
+                }
+
+                @Override
+                public void onCapabilitiesChanged(Network network, NetworkCapabilities networkCapabilities) {
+                    super.onCapabilitiesChanged(network, networkCapabilities);
+                    boolean hasInternet = networkCapabilities != null
+                            && networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                            && networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+                    isNetworkConnected = hasInternet;
+                    Log.d(TAG, "Network capabilities changed. Internet validated: " + hasInternet);
+                }
+            };
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 connectivityManager.registerDefaultNetworkCallback(networkCallback);
-                Log.d(TAG, "Registered default network callback for connectivity resilience.");
+                Log.d(TAG, "Registered default network callback.");
+            } else {
+                NetworkRequest request = new NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    .build();
+                connectivityManager.registerNetworkCallback(request, networkCallback);
+                Log.d(TAG, "Registered network callback with NetworkRequest.");
             }
         } catch (Exception e) {
-            Log.w(TAG, "Could not register default network callback", e);
+            Log.w(TAG, "Could not register network callback", e);
         }
     }
 
@@ -262,6 +339,28 @@ public class ZapForegroundService extends Service {
         }
     }
 
+    @SuppressWarnings("deprecation")
+    public static boolean isNetworkAvailable(Context context) {
+        if (context == null) return false;
+        try {
+            ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Network active = cm.getActiveNetwork();
+                if (active == null) return false;
+                NetworkCapabilities caps = cm.getNetworkCapabilities(active);
+                return caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+            } else {
+                android.net.NetworkInfo netInfo = cm.getActiveNetworkInfo();
+                return netInfo != null && netInfo.isConnected();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking network connectivity", e);
+            return false;
+        }
+    }
+
+    @SuppressWarnings("deprecation")
     private void stopServiceGracefully() {
         isRunning = false;
         releaseWakeLock();

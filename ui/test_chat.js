@@ -150,6 +150,12 @@ global.requestAnimationFrame = (cb) => cb();
 global.window.ZapBridge = {
   calls: [],
   sendMessage: (payload) => { global.window.ZapBridge.calls.push({ action: 'sendMessage', payload: JSON.parse(payload) }); },
+  sendButtonMessage: (payload) => {
+    global.window.ZapBridge.calls.push({
+      action: 'sendButtonMessage',
+      payload: typeof payload === 'string' ? JSON.parse(payload) : payload
+    });
+  },
   onQuickReplyClick: (payload) => { global.window.ZapBridge.calls.push({ action: 'onQuickReplyClick', payload: JSON.parse(payload) }); },
   openUrl: (payload) => { global.window.ZapBridge.calls.push({ action: 'openUrl', payload: JSON.parse(payload) }); },
   copyToClipboard: (payload) => { global.window.ZapBridge.calls.push({ action: 'copyToClipboard', payload: JSON.parse(payload) }); },
@@ -239,5 +245,65 @@ window.onReceiveMessage(JSON.stringify({
 const hookedMsg = window.ZapChat.getMessages('engineering_core').find(m => m.id === 'msg_from_android_hook');
 assert(hookedMsg, 'Android hook message must be received');
 console.log('  [PASS] Android WebView global callbacks verified');
+
+// 7. Test sendButtonMessage with Quick Reply, CTA URL, CTA Copy, and viewOnce wrapper
+const btnList = [
+  { type: 'quick_reply', display_text: 'Konfirmasi', id: 'btn_confirm_1' },
+  { type: 'cta_url', display_text: 'Website', url: 'https://whatsapp.com' },
+  { type: 'cta_copy', display_text: 'Kode Kupon', copy_code: 'ZAPO2026' }
+];
+const btnMsgId = window.ZapChat.sendButtonMessage('Silakan pilih opsi:', btnList, { viewOnce: true });
+assert(btnMsgId, 'sendButtonMessage must return message ID');
+const storedBtnMsg = window.ZapChat.getMessages('engineering_core').find(m => m.id === btnMsgId);
+assert(storedBtnMsg, 'Interactive button message must be stored in messageStore');
+assert.strictEqual(storedBtnMsg.viewOnce, true, 'Stored message must have viewOnce flag set');
+assert.strictEqual(storedBtnMsg.buttons.length, 3, 'Stored message must contain all 3 buttons');
+
+const sentBtnBridgeCall = window.ZapBridge.calls.find(c => c.action === 'sendButtonMessage');
+assert(sentBtnBridgeCall, 'Native bridge sendButtonMessage must be invoked');
+assert.strictEqual(sentBtnBridgeCall.payload.viewOnce, true, 'Bridge payload must include viewOnce: true');
+assert(sentBtnBridgeCall.payload.viewOnceMessage, 'Bridge payload must include viewOnceMessage wrapper');
+assert(sentBtnBridgeCall.payload.buttons.length === 3, 'Bridge payload must include all buttons');
+console.log('  [PASS] sendButtonMessage with Quick Reply, CTA URL, Copy & viewOnce wrapper verified');
+
+// 8. Test Zapo Button Composer Modal
+assert(typeof window.ZapChat.openButtonComposer === 'function', 'openButtonComposer must be a function');
+assert(typeof window.ZapChat.closeButtonComposer === 'function', 'closeButtonComposer must be a function');
+window.ZapChat.openButtonComposer();
+const composerModal = document.getElementById('zapo-button-modal');
+assert(composerModal, 'Composer modal element must exist in DOM');
+assert(composerModal.classList.contains('active'), 'Modal must have active class after openButtonComposer');
+
+window.ZapChat.closeButtonComposer();
+assert(!composerModal.classList.contains('active'), 'Modal must not have active class after closeButtonComposer');
+
+// Re-open and simulate composer submit button click
+window.ZapChat.openButtonComposer();
+registerElements(appEl);
+const submitBtn = composerModal.querySelector('#zapo-modal-submit-btn');
+assert(submitBtn, 'Submit button must exist in modal');
+submitBtn.click();
+assert(!composerModal.classList.contains('active'), 'Modal should auto-close after submission');
+console.log('  [PASS] Zapo Button Composer modal open/close/submit workflow verified');
+
+// 9. Test interactive button click handlers in message bubbles
+const flowBtns = appEl.querySelectorAll('.chat-flow-btn');
+assert(flowBtns.length >= 3, 'Must render interactive button elements');
+
+// Quick reply click
+flowBtns[0].click();
+const qrBridgeCall = window.ZapBridge.calls.find(c => c.action === 'onQuickReplyClick');
+assert(qrBridgeCall, 'onQuickReplyClick must be dispatched to native bridge');
+
+// CTA URL click
+flowBtns[1].click();
+const urlBridgeCall = window.ZapBridge.calls.find(c => c.action === 'openUrl');
+assert(urlBridgeCall, 'openUrl must be dispatched to native bridge');
+
+// Copy button click
+flowBtns[2].click();
+const copyBridgeCall = window.ZapBridge.calls.find(c => c.action === 'copyToClipboard');
+assert(copyBridgeCall, 'copyToClipboard must be dispatched to native bridge');
+console.log('  [PASS] Button click handlers (Quick Reply, CTA URL, Copy) verified');
 
 console.log('ALL TESTS PASSED CLEANLY.');

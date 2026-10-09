@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  // ponytail: in-memory state and timer intervals; upgrade to Web Workers or Service Worker sync if background background tab throttling affects pairing timers.
+  // ponytail: in-memory state and timer intervals; upgrade to Web Workers or Service Worker sync if background tab throttling affects pairing timers.
 
   // ---------------------------------------------------------------------------
   // Standalone QR Code SVG Matrix Generator (ISO/IEC 18004 Byte Mode)
@@ -257,7 +257,7 @@
   };
 
   // ---------------------------------------------------------------------------
-  // State Store
+  // State Store & Strict Mandatory Gate Helper
   // ---------------------------------------------------------------------------
 
   const DEFAULT_QR_TTL = 30; // 30 seconds auto-refresh interval
@@ -265,10 +265,11 @@
 
   const state = {
     isOpen: false,
+    isPaired: false,
     method: 'qr', // 'qr' | 'phone'
     uiState: 'qr', // 'qr' | 'phone_input' | 'pairing_code' | 'connecting' | 'paired' | 'syncing' | 'completed' | 'error'
     phoneNumber: '',
-    countryCode: '+1',
+    countryCode: '+62',
     pairingCode: '',
     qrPayload: '',
     qrTimerRemaining: DEFAULT_QR_TTL,
@@ -281,6 +282,16 @@
     errorMessage: '',
     deviceInfo: null
   };
+
+  function checkIsPaired() {
+    try {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('zap_is_paired') === 'true') {
+        state.isPaired = true;
+        return true;
+      }
+    } catch (_) {}
+    return state.isPaired === true || state.uiState === 'completed' || state.uiState === 'paired';
+  }
 
   // ---------------------------------------------------------------------------
   // Native Bridge Dispatcher
@@ -372,9 +383,11 @@
           <button class="pairing-back-btn" id="pairing-back-btn" aria-label="Back">
             ${ICONS.back}
           </button>
-          <h2 class="pairing-header-title" id="pairing-header-title">Link a Device</h2>
+          <h2 class="pairing-header-title" id="pairing-header-title">Tautkan Perangkat</h2>
         </div>
-        <div class="pairing-header-badge" id="pairing-header-badge">E2E ENCRYPTED</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div class="pairing-header-badge" id="pairing-header-badge">E2E ENCRYPTED</div>
+        </div>
       </header>
 
       <div class="pairing-content">
@@ -413,27 +426,27 @@
           </div>
 
           <div class="pairing-steps-card">
-            <div class="pairing-steps-title">To link your companion device:</div>
+            <div class="pairing-steps-title">Langkah menautkan WhatsApp Anda:</div>
             <div class="pairing-step-item">
               <span class="pairing-step-num">1</span>
-              <span class="pairing-step-text">Open <strong>ZapApp</strong> on your primary phone</span>
+              <span class="pairing-step-text">Buka <strong>WhatsApp</strong> di ponsel utama Anda</span>
             </div>
             <div class="pairing-step-item">
               <span class="pairing-step-num">2</span>
-              <span class="pairing-step-text">Tap <strong>Menu ⋮</strong> or <strong>Settings ⚙️</strong> &gt; <strong>Linked Devices</strong></span>
+              <span class="pairing-step-text">Ketuk <strong>Menu ⋮</strong> atau <strong>Setelan ⚙️</strong> &gt; <strong>Perangkat tertaut</strong></span>
             </div>
             <div class="pairing-step-item">
               <span class="pairing-step-num">3</span>
-              <span class="pairing-step-text">Tap <strong>Link a Device</strong></span>
+              <span class="pairing-step-text">Ketuk <strong>Tautkan perangkat</strong></span>
             </div>
             <div class="pairing-step-item">
               <span class="pairing-step-num">4</span>
-              <span class="pairing-step-text">Point your camera at this QR code to confirm pairing</span>
+              <span class="pairing-step-text">Arahkan kamera ke kode QR ini untuk memindai</span>
             </div>
           </div>
 
           <button class="pairing-switch-link" id="qr-switch-phone-link">
-            Link with phone number instead &rarr;
+            Tautkan dengan nomor telepon saja &rarr;
           </button>
         </section>
 
@@ -447,9 +460,9 @@
 
             <div class="phone-input-row">
               <select class="phone-country-select" id="phone-country-select" aria-label="Country Code">
-                <option value="+1" selected>US (+1)</option>
+                <option value="+62" selected>Indonesia (+62)</option>
+                <option value="+1">US / Canada (+1)</option>
                 <option value="+44">UK (+44)</option>
-                <option value="+62">ID (+62)</option>
                 <option value="+55">BR (+55)</option>
                 <option value="+91">IN (+91)</option>
                 <option value="+49">DE (+49)</option>
@@ -511,7 +524,7 @@
             <div class="pairing-steps-title">Instructions on your phone:</div>
             <div class="pairing-step-item">
               <span class="pairing-step-num">1</span>
-              <span class="pairing-step-text">Open the <strong>ZapApp notification</strong> on your phone</span>
+              <span class="pairing-step-text">Open the <strong>WhatsApp notification</strong> on your phone</span>
             </div>
             <div class="pairing-step-item">
               <span class="pairing-step-num">2</span>
@@ -612,10 +625,11 @@
     ];
 
     bindEvents();
+    updateActiveSections();
   }
 
   function bindEvents() {
-    // Back button
+    // Back button: Strict mandatory gate - cannot close until paired
     if (dom.backBtn) {
       dom.backBtn.addEventListener('click', function () {
         if (state.uiState === 'phone_input' || state.uiState === 'pairing_code') {
@@ -623,7 +637,12 @@
         } else if (state.uiState === 'connecting' || state.uiState === 'error') {
           window.ZapAuth.reset();
         } else {
-          window.ZapAuth.close();
+          // In QR mode: close ONLY if already paired
+          if (checkIsPaired()) {
+            window.ZapAuth.close();
+          } else {
+            showError('Pairing is mandatory to access ZapApp.');
+          }
         }
       });
     }
@@ -723,7 +742,8 @@
       showError('Please enter a valid phone number with at least 7 digits.');
       return;
     }
-    const fullPhone = dom.countrySelect.value + ' ' + rawDigits;
+    const countryVal = (dom.countrySelect && dom.countrySelect.value) ? dom.countrySelect.value : '+62';
+    const fullPhone = countryVal + ' ' + rawDigits;
     window.ZapAuth.submitPhoneNumber(fullPhone);
   }
 
@@ -755,7 +775,7 @@
   }
 
   function renderPairingCode(code) {
-    const clean = (code || '--------').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const clean = String(code || '--------').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     const chars = clean.padEnd(8, '-').slice(0, 8);
 
     for (let i = 0; i < 8; i++) {
@@ -774,8 +794,15 @@
 
   function renderQrCode(payload) {
     if (!dom.qrSvgContainer) return;
-    const svg = generateQrSvg(payload);
-    dom.qrSvgContainer.innerHTML = svg;
+    const content = payload || '';
+    if (typeof content === 'string' && content.trim().startsWith('<svg')) {
+      dom.qrSvgContainer.innerHTML = content;
+    } else if (typeof content === 'string' && (content.startsWith('data:image/') || content.startsWith('http'))) {
+      dom.qrSvgContainer.innerHTML = '<img src="' + content + '" alt="WhatsApp QR Code" style="width:100%;height:100%;object-fit:contain;border-radius:6px;" />';
+    } else {
+      const svg = generateQrSvg(typeof content === 'string' ? content : JSON.stringify(content));
+      dom.qrSvgContainer.innerHTML = svg;
+    }
     if (dom.qrExpiredOverlay) dom.qrExpiredOverlay.classList.remove('active');
   }
 
@@ -916,6 +943,16 @@
     const activeSec = sMap[state.uiState] || dom.sectionQr;
     if (activeSec) activeSec.classList.add('active');
 
+    // Strict Mandatory Gate: Back button visibility
+    if (dom.backBtn) {
+      const isPaired = checkIsPaired();
+      if (state.uiState === 'qr') {
+        dom.backBtn.style.display = isPaired ? 'flex' : 'none';
+      } else {
+        dom.backBtn.style.display = 'flex';
+      }
+    }
+
     // Tabs visibility
     const isSetupState = (state.uiState === 'qr' || state.uiState === 'phone_input');
     if (dom.tabsContainer) {
@@ -958,6 +995,11 @@
       return state.isOpen;
     },
 
+    // Check if device is authenticated / paired
+    isPaired: function () {
+      return checkIsPaired();
+    },
+
     // Get current state snapshot
     getState: function () {
       return Object.assign({}, state);
@@ -983,8 +1025,13 @@
       });
     },
 
-    // Close pairing screen
-    close: function () {
+    // Close pairing screen (Mandatory gate: refused if not paired unless forced)
+    close: function (force) {
+      if (!checkIsPaired() && !force) {
+        console.warn('[ZapAuth] Pairing is mandatory. Auth screen cannot be closed until paired.');
+        showError('Pairing is mandatory to access ZapApp.');
+        return false;
+      }
       stopQrTimer();
       stopCodeTimer();
       stopSyncInterval();
@@ -997,6 +1044,7 @@
         toState: 'closed',
         method: state.method
       });
+      return true;
     },
 
     // Switch between QR code and phone number mode
@@ -1009,7 +1057,9 @@
         stopQrTimer();
         this.setState('phone_input');
         if (dom.phoneInput) {
-          setTimeout(function () { dom.phoneInput.focus(); }, 150);
+          setTimeout(function () {
+            if (dom.phoneInput && typeof dom.phoneInput.focus === 'function') dom.phoneInput.focus();
+          }, 150);
         }
       } else {
         stopCodeTimer();
@@ -1018,7 +1068,7 @@
       }
     },
 
-    // Set high-level state
+    // Set high-level state and orchestrate smooth transitions
     setState: function (newState, data) {
       initDOM();
       const prevState = state.uiState;
@@ -1069,6 +1119,8 @@
           break;
 
         case 'paired':
+          state.isPaired = true;
+          try { if (typeof localStorage !== 'undefined') localStorage.setItem('zap_is_paired', 'true'); } catch (e) {}
           dom.title.textContent = 'Device Paired';
           dom.transitionIconSlot.innerHTML = `
             <div class="transition-check-icon">
@@ -1080,6 +1132,15 @@
             ? 'Linked to ' + state.deviceInfo.name + '. Secure session established.'
             : 'Companion device successfully registered. Preparing chat database...';
           if (dom.syncProgressWrapper) dom.syncProgressWrapper.style.display = 'none';
+
+          // Smoothly advance to syncing if not already transitioning
+          if (!data || !data.manual) {
+            setTimeout(function () {
+              if (state.uiState === 'paired') {
+                window.ZapAuth.startSyncing(2000);
+              }
+            }, 1000);
+          }
           break;
 
         case 'syncing':
@@ -1096,6 +1157,8 @@
           break;
 
         case 'completed':
+          state.isPaired = true;
+          try { if (typeof localStorage !== 'undefined') localStorage.setItem('zap_is_paired', 'true'); } catch (e) {}
           dom.title.textContent = 'All Set!';
           dom.transitionIconSlot.innerHTML = `
             <div class="transition-check-icon">
@@ -1106,6 +1169,10 @@
           dom.transitionDesc.textContent = 'Pairing complete. Welcome to ZapApp!';
           if (dom.syncProgressWrapper) dom.syncProgressWrapper.style.display = 'none';
           dispatchNativeBridge('onPairingCompleted', state.deviceInfo || { deviceId: 1 });
+          setTimeout(function() {
+            window.ZapAuth.close(true);
+            if (window.updatePairingBanner) window.updatePairingBanner();
+          }, 600);
           break;
 
         case 'error':
@@ -1128,7 +1195,7 @@
       });
     },
 
-    // Set QR code payload directly
+    // Set QR code payload directly and render instantly
     setQrCode: function (payload, ttlSecs) {
       initDOM();
       state.qrPayload = payload;
@@ -1145,35 +1212,43 @@
       dispatchNativeBridge('onRequestQr', { ref: mockRef });
     },
 
-    // Submit phone number to get 8-digit code
+    // Submit phone number to request live 8-digit code from Meta
     submitPhoneNumber: function (phoneNumber) {
       initDOM();
       state.phoneNumber = phoneNumber;
       showError('');
 
-      const generatedCode = generateSamplePairingCode();
-      state.pairingCode = generatedCode;
+      // Clean digits for bridge / Meta API request
+      const cleanDigits = phoneNumber.replace(/[^0-9]/g, '');
+
+      // Generate 8-character sample code as immediate initial value
+      const sampleCode = generateSamplePairingCode();
+      state.pairingCode = sampleCode;
 
       this.setState('pairing_code', {
         phoneNumber: phoneNumber,
-        pairingCode: generatedCode,
+        pairingCode: sampleCode,
         ttl: DEFAULT_PAIRING_CODE_TTL
       });
 
+      // Call bridge to request live 8-digit code from Meta
       dispatchNativeBridge('onRequestPairingCode', {
         phoneNumber: phoneNumber,
-        code: generatedCode
+        phone: cleanDigits,
+        code: sampleCode
       });
     },
 
-    // Set 8-digit pairing code explicitly
+    // Set 8-digit pairing code explicitly and render in segmented boxes
     setPairingCode: function (code, ttlSecs) {
       initDOM();
-      state.pairingCode = code;
+      const clean = String(code || '--------').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+      state.pairingCode = clean;
       this.setState('pairing_code', {
-        pairingCode: code,
+        pairingCode: clean,
         ttl: ttlSecs || DEFAULT_PAIRING_CODE_TTL
       });
+      renderPairingCode(clean);
     },
 
     // Trigger Connecting state
@@ -1186,10 +1261,10 @@
       this.setState('paired', { deviceInfo: deviceInfo || { name: 'Primary Phone', id: 1 } });
     },
 
-    // Start / update Syncing state
+    // Start / update Syncing state with smooth progress simulation
     startSyncing: function (durationMs, onComplete) {
       this.setState('syncing', { progress: 0 });
-      const duration = durationMs || 3000;
+      const duration = durationMs || 2500;
       const startTime = Date.now();
       const self = this;
 
@@ -1199,9 +1274,9 @@
         const progress = Math.min(100, (elapsed / duration) * 100);
 
         let subtext = 'Downloading chat encryption keys...';
-        if (progress > 30) subtext = 'Syncing conversation history...';
-        if (progress > 70) subtext = 'Organizing contacts and media...';
-        if (progress >= 100) subtext = 'Finalizing chat database...';
+        if (progress > 25) subtext = 'Syncing conversation history...';
+        if (progress > 60) subtext = 'Organizing contacts and media...';
+        if (progress >= 95) subtext = 'Finalizing chat database...';
 
         updateSyncUI(progress, subtext);
         dispatchNativeBridge('onSyncProgress', { progress: Math.round(progress) });
@@ -1209,12 +1284,18 @@
         if (progress >= 100) {
           stopSyncInterval();
           self.setState('completed');
-          setTimeout(function () {
-            self.close();
-            if (typeof onComplete === 'function') onComplete();
-          }, 1200);
+          if (typeof onComplete === 'function') onComplete();
         }
-      }, 100);
+      }, 80);
+    },
+
+    // Smooth end-to-end transition: Connecting -> Paired -> Syncing -> Chat screen
+    transitionToPaired: function (deviceInfo) {
+      const self = this;
+      self.setState('connecting');
+      setTimeout(function () {
+        self.setState('paired', { deviceInfo: deviceInfo || { name: 'Primary Phone', id: 1 } });
+      }, 700);
     },
 
     // Reset back to initial state
@@ -1226,6 +1307,7 @@
       state.pairingCode = '';
       state.phoneNumber = '';
       state.syncProgress = 0;
+      state.isPaired = false;
       this.switchMethod('qr');
     },
 
@@ -1233,9 +1315,9 @@
     simulatePairingFlow: function (opts) {
       const self = this;
       const options = Object.assign({
-        connectDelay: 1000,
-        pairedDelay: 1200,
-        syncDuration: 2500
+        connectDelay: 800,
+        pairedDelay: 1000,
+        syncDuration: 2200
       }, opts || {});
 
       self.startConnecting();
@@ -1254,8 +1336,15 @@
 
   window.onPairingStateUpdate = function (jsonStr) {
     try {
-      const data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
-      if (data.state) {
+      let data = jsonStr;
+      if (typeof jsonStr === 'string') {
+        try {
+          data = JSON.parse(jsonStr);
+        } catch (_) {
+          data = { state: jsonStr };
+        }
+      }
+      if (data && data.state) {
         window.ZapAuth.setState(data.state, data);
       }
     } catch (err) {
@@ -1263,32 +1352,80 @@
     }
   };
 
+  // Display live WhatsApp QR instantly when received from server
   window.onQrReceived = function (jsonStr) {
     try {
-      const data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
-      const payload = data.qrPayload || data.payload || data;
-      const ttl = data.ttl || DEFAULT_QR_TTL;
-      window.ZapAuth.setQrCode(payload, ttl);
+      let data = jsonStr;
+      if (typeof jsonStr === 'string') {
+        try {
+          data = JSON.parse(jsonStr);
+        } catch (_) {
+          data = jsonStr;
+        }
+      }
+      let payload = data;
+      let ttl = DEFAULT_QR_TTL;
+      if (typeof data === 'object' && data !== null) {
+        payload = data.qrPayload || data.payload || data.qr || data.code || data.data || data.qr_code || payload;
+        ttl = data.ttl || ttl;
+      }
+      if (typeof payload === 'object' && payload !== null) {
+        payload = JSON.stringify(payload);
+      }
+      const payloadStr = String(payload != null ? payload : '');
+      if (!payloadStr) return;
+
+      initDOM();
+      if (!state.isOpen) {
+        state.isOpen = true;
+        if (dom.view) dom.view.classList.add('active');
+      }
+      if (state.uiState !== 'qr' && state.uiState !== 'phone_input' && state.uiState !== 'pairing_code') {
+        state.method = 'qr';
+        state.uiState = 'qr';
+        updateActiveSections();
+      }
+
+      window.ZapAuth.setQrCode(payloadStr, ttl);
     } catch (err) {
       console.warn('[onQrReceived] Parse error:', err);
     }
   };
 
+  // Display live 8-digit code from Meta in segmented boxes
   window.onPairingCodeReceived = function (jsonStr) {
     try {
-      const data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
-      const code = data.code || data.pairingCode || data;
-      const ttl = data.ttl || DEFAULT_PAIRING_CODE_TTL;
-      window.ZapAuth.setPairingCode(code, ttl);
+      let data = jsonStr;
+      if (typeof jsonStr === 'string') {
+        try {
+          data = JSON.parse(jsonStr);
+        } catch (_) {
+          data = jsonStr;
+        }
+      }
+      let rawCode = data;
+      let ttl = DEFAULT_PAIRING_CODE_TTL;
+      if (typeof data === 'object' && data !== null) {
+        rawCode = data.code || data.pairingCode || data.pairing_code || rawCode;
+        ttl = data.ttl || ttl;
+      }
+      const codeStr = rawCode != null ? String(rawCode).replace(/[^A-Za-z0-9]/g, '').toUpperCase() : '';
+      if (codeStr) {
+        window.ZapAuth.setPairingCode(codeStr, ttl);
+      }
     } catch (err) {
       console.warn('[onPairingCodeReceived] Parse error:', err);
     }
   };
 
+  // Sync progress updates
   window.onSyncProgressUpdate = function (jsonStr) {
     try {
       const data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
       const progress = typeof data.progress === 'number' ? data.progress : parseInt(data.progress, 10);
+      if (state.uiState !== 'syncing' && state.uiState !== 'completed') {
+        window.ZapAuth.setState('syncing', data);
+      }
       updateSyncUI(progress, data.subtext || 'Syncing chats...');
       if (progress >= 100) {
         window.ZapAuth.setState('completed');
